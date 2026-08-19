@@ -63,6 +63,13 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Botones de ejemplo ("Probar seguro" / "Probar malicioso")
+Cada panel de herramienta tiene 1-2 botones que rellenan (y para formularios, envían) un caso de ejemplo, para probar la app sin tener que buscar/crear datos de prueba. Todo en `js/sampleData.js`:
+- **Texto** (URLs, Correo, SMS, JWT, Decodificador, Secretos, Contraseña): strings hardcoded, botón rellena el campo y dispara `submit`/`input`.
+- **Archivos** (Archivos, EXIF, Apps): generadores que construyen un `File` en memoria reutilizando los mismos builders byte-a-byte de `tests/fixtures.js` (PDF real vs `.exe` renombrado `.pdf`, JPEG con/sin GPS, APK/IPA con permisos peligrosos + secreto embebido) — mismo `handle(file)` que usa drag&drop, cero código nuevo de procesamiento.
+
+19 botones en total, probados uno a uno vía UI real (click → resultado renderizado), no solo la lógica subyacente.
+
 ## Fuera de alcance (futuro)
 - Integración VirusTotal / Google Safe Browsing (requiere API key)
 - Timeline hop-a-hop completa de redirects (requeriría proxy propio, no genérico)

@@ -105,6 +105,11 @@
     <h1>Verificador de URLs</h1>
     <p class="hint">Analiza una URL (acortada o no): heurísticas de patrones, typosquatting y homógrafos siempre offline. Resolver el destino final y la edad del dominio requieren red — actívalo abajo si lo necesitas.</p>
 
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleUrlSafe">✅ Probar seguro</button>
+      <button type="button" class="sample-btn danger" id="sampleUrlMalicious">🚩 Probar malicioso</button>
+    </div>
+
     <form id="urlForm" class="row">
       <input id="urlInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
              placeholder="https://bit.ly/ejemplo" required>
@@ -126,6 +131,11 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Comprobador de archivos (magic bytes)</h1>
     <p class="hint">Lee los primeros bytes del archivo para detectar su tipo real y compararlo con la extensión. Todo ocurre en tu dispositivo — el archivo nunca sale de aquí.</p>
+
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleFileSafe">✅ Probar seguro</button>
+      <button type="button" class="sample-btn danger" id="sampleFileMalicious">🚩 Probar malicioso</button>
+    </div>
 
     <div id="dropZone" class="dropzone">
       <p>Arrastra un archivo aquí, o</p>
@@ -152,6 +162,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Análisis de correo</h1>
     <p class="hint">Pega las cabeceras completas del correo (o el .eml entero) — en Gmail: "Mostrar original"; en Outlook: "Ver origen del mensaje". Se analiza SPF/DKIM/DMARC, coincidencia From/Return-Path/Reply-To y suplantación de marca. Todo offline, texto local.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleMailSafe">✅ Probar seguro</button>
+      <button type="button" class="sample-btn danger" id="sampleMailMalicious">🚩 Probar malicioso</button>
+    </div>
     <form id="mailForm">
       <textarea id="mailInput" rows="8" placeholder="From: ...&#10;Return-Path: ...&#10;Authentication-Results: ...&#10;..." required></textarea>
       <button type="submit">Analizar cabeceras</button>
@@ -163,6 +177,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Análisis de SMS / mensajes</h1>
     <p class="hint">Pega el texto del SMS o mensaje sospechoso. Se buscan patrones de smishing: urgencia, ganchos, peticiones de credenciales y enlaces (acortados, typosquat, IP literal…). Todo offline.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleSmsSafe">✅ Probar seguro</button>
+      <button type="button" class="sample-btn danger" id="sampleSmsMalicious">🚩 Probar malicioso</button>
+    </div>
     <form id="smsForm">
       <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
       <button type="submit">Analizar mensaje</button>
@@ -174,6 +192,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>JWT</h1>
     <p class="hint">Decodifica un JWT (header + payload). No verifica la firma — solo lectura, ideal para inspeccionar tokens sin exponerlos a servicios externos. No se guarda en historial.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleJwtSafe">✅ Probar válido</button>
+      <button type="button" class="sample-btn danger" id="sampleJwtMalicious">🚩 Probar alg:none</button>
+    </div>
     <form id="jwtForm">
       <textarea id="jwtInput" rows="4" placeholder="eyJhbGciOi...header.eyJzdWIiOi...payload.firma" required></textarea>
       <button type="submit">Decodificar</button>
@@ -185,6 +207,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Contraseña</h1>
     <p class="hint">Estimación de fuerza offline (entropía + patrones comunes). La contraseña no se envía ni se guarda en ningún sitio, ni siquiera en el historial.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn danger" id="samplePasswordWeak">🚩 Probar débil</button>
+      <button type="button" class="sample-btn" id="samplePasswordStrong">✅ Probar fuerte</button>
+    </div>
     <div class="row">
       <input id="passwordInput" type="password" autocomplete="off" placeholder="Escribe una contraseña para probar">
       <button type="button" id="passwordToggle" class="secondary">Ver</button>
@@ -196,6 +222,9 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Decodificador</h1>
     <p class="hint">Prueba Base64, Base64url, Hex y URL-decode sobre el texto — útil para inspeccionar payloads ofuscados.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleDecode">▶ Probar ejemplo</button>
+    </div>
     <form id="decodeForm">
       <textarea id="decodeInput" rows="4" placeholder="SGVsbG8gbXVuZG8=" required></textarea>
       <button type="submit">Decodificar</button>
@@ -207,6 +236,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Escáner de secretos</h1>
     <p class="hint">Pega código o config: busca AWS/GitHub/Slack/Stripe/Google keys, tokens, claves privadas y asignaciones tipo <code>api_key=...</code>. Los valores se muestran parcialmente ocultos. No se guarda en historial.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleSecretsSafe">✅ Probar limpio</button>
+      <button type="button" class="sample-btn danger" id="sampleSecretsMalicious">🚩 Probar con secretos</button>
+    </div>
     <form id="secretsForm">
       <textarea id="secretsInput" rows="8" placeholder="const AWS_KEY = 'AKIA...'&#10;api_key: 'sk_live_...'" required></textarea>
       <button type="submit">Escanear</button>
@@ -218,6 +251,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Apps (APK / IPA)</h1>
     <p class="hint">Sube un .apk o .ipa: extrae el manifest (<code>AndroidManifest.xml</code> o <code>Info.plist</code>) — paquete + permisos declarados, marcando los peligrosos — y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn danger" id="sampleAppsApk">🤖 Probar APK sospechosa</button>
+      <button type="button" class="sample-btn danger" id="sampleAppsIpa">🍎 Probar IPA sospechosa</button>
+    </div>
     <div class="dropzone" id="appsDropZone">
       <p>Arrastra un .apk, .ipa u otro binario aquí, o</p>
       <label class="filebtn">
@@ -232,6 +269,10 @@
     <button class="back-btn" data-back>← Inicio</button>
     <h1>EXIF</h1>
     <p class="hint">Lee metadatos EXIF de una foto (JPEG): cámara, fecha y — lo más importante antes de compartirla — si lleva coordenadas GPS. Se procesa en tu dispositivo.</p>
+    <div class="sample-row">
+      <button type="button" class="sample-btn" id="sampleExifClean">✅ Foto sin GPS</button>
+      <button type="button" class="sample-btn danger" id="sampleExifGps">🚩 Foto con GPS</button>
+    </div>
     <div class="dropzone" id="exifDropZone">
       <p>Arrastra una imagen aquí, o</p>
       <label class="filebtn">

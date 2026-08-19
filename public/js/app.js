@@ -9,6 +9,15 @@ import { parseExif } from "./modules/exifModule.js";
 import { scanSecrets } from "./modules/secretsModule.js";
 import { checkApp } from "./modules/appsModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
+import {
+  SAMPLES,
+  sampleSafePdfFile,
+  sampleDisguisedFile,
+  sampleGpsPhotoFile,
+  sampleCleanPhotoFile,
+  sampleSpywareApkFile,
+  sampleSpywareIpaFile,
+} from "./sampleData.js";
 
 const ALL_FLAG_LABELS = {
   ...FLAG_LABELS,
@@ -29,6 +38,16 @@ function escapeHtml(str) {
 function flagsHtml(flags, emptyText = "Sin señales de riesgo") {
   if (!flags || flags.length === 0) return `<li class="info">${escapeHtml(emptyText)}</li>`;
   return flags.map((f) => `<li class="warn">${escapeHtml(ALL_FLAG_LABELS[f] || f)}</li>`).join("");
+}
+
+function wireSample(buttonId, inputEl, value, formEl) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    inputEl.value = value;
+    if (formEl) formEl.requestSubmit();
+    else inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+  });
 }
 
 // ---- Navigation (home grid + per-tool panels) ----
@@ -107,6 +126,9 @@ function initUrlForm() {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }
   });
+
+  wireSample("sampleUrlSafe", input, SAMPLES.urlSafe, form);
+  wireSample("sampleUrlMalicious", input, SAMPLES.urlMalicious, form);
 }
 
 function renderUrlResult(el, r) {
@@ -146,6 +168,9 @@ function initFileModule() {
 
   fileInput.addEventListener("change", () => handle(fileInput.files[0]));
   wireDropZone(dropZone, handle);
+
+  document.getElementById("sampleFileSafe").addEventListener("click", () => handle(sampleSafePdfFile()));
+  document.getElementById("sampleFileMalicious").addEventListener("click", () => handle(sampleDisguisedFile()));
 }
 
 function wireDropZone(dropZone, handle) {
@@ -206,6 +231,9 @@ function initMailForm() {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }
   });
+
+  wireSample("sampleMailSafe", input, SAMPLES.mailSafe, form);
+  wireSample("sampleMailMalicious", input, SAMPLES.mailMalicious, form);
 }
 
 // ---- SMS module ----
@@ -235,6 +263,9 @@ function initSmsForm() {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }
   });
+
+  wireSample("sampleSmsSafe", input, SAMPLES.smsSafe, form);
+  wireSample("sampleSmsMalicious", input, SAMPLES.smsMalicious, form);
 }
 
 // ---- JWT tool ----
@@ -260,6 +291,9 @@ function initJwtTool() {
       resultEl.innerHTML = `<p class="hint">${escapeHtml(err.message || String(err))}</p>`;
     }
   });
+
+  wireSample("sampleJwtSafe", input, SAMPLES.jwtSafe, form);
+  wireSample("sampleJwtMalicious", input, SAMPLES.jwtMalicious, form);
 }
 
 // ---- Password tool ----
@@ -291,6 +325,9 @@ function initPasswordTool() {
       <ul class="flags">${flagsHtml(flags, "Sin patrones débiles detectados")}</ul>
     `;
   });
+
+  wireSample("samplePasswordWeak", input, SAMPLES.passwordWeak);
+  wireSample("samplePasswordStrong", input, SAMPLES.passwordStrong);
 }
 
 // ---- Decode tool ----
@@ -318,6 +355,8 @@ function initDecodeTool() {
       )
       .join("");
   });
+
+  wireSample("sampleDecode", input, SAMPLES.decodeSample, form);
 }
 
 // ---- Secrets tool ----
@@ -356,6 +395,9 @@ function initSecretsTool() {
       <ul class="flags">${items}</ul>
     `;
   });
+
+  wireSample("sampleSecretsSafe", input, SAMPLES.secretsClean, form);
+  wireSample("sampleSecretsMalicious", input, SAMPLES.secretsDirty, form);
 }
 
 // ---- EXIF tool ----
@@ -392,6 +434,9 @@ function initExifTool() {
 
   fileInput.addEventListener("change", () => handle(fileInput.files[0]));
   wireDropZone(dropZone, handle);
+
+  document.getElementById("sampleExifClean").addEventListener("click", () => handle(sampleCleanPhotoFile()));
+  document.getElementById("sampleExifGps").addEventListener("click", () => handle(sampleGpsPhotoFile()));
 }
 
 // ---- Apps tool ----
@@ -435,6 +480,9 @@ function initAppsTool() {
 
   fileInput.addEventListener("change", () => handle(fileInput.files[0]));
   wireDropZone(dropZone, handle);
+
+  document.getElementById("sampleAppsApk").addEventListener("click", () => handle(sampleSpywareApkFile()));
+  document.getElementById("sampleAppsIpa").addEventListener("click", () => handle(sampleSpywareIpaFile()));
 }
 
 // ---- History ----
