@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cerberus — Centro de análisis</title>
+<meta name="description" content="Estación local de comprobaciones de ciberseguridad: URLs, archivos y más.">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" id="brandHome" role="button" tabindex="0" aria-label="Ir a inicio">
+    <img src="icons/icon.svg" alt="" width="28" height="28">
+    <span>CERBERUS</span>
+  </div>
+  <div class="topbar-actions">
+    <span class="badge-offline" id="netBadge">local</span>
+    <button class="icon-btn" id="historyBtn" aria-label="Historial" title="Historial">🕘</button>
+  </div>
+</header>
+
+<main id="main">
+
+  <section id="panel-home" class="panel active">
+    <p class="hint home-intro">Centro de mando de comprobaciones de ciberseguridad. Todo corre en tu dispositivo salvo donde se indique red opcional.</p>
+
+    <div class="category">
+      <h2 class="category-title">Comunicaciones</h2>
+      <div class="grid">
+        <button class="tool-card" data-open="url">
+          <span class="tool-icon">🔗</span>
+          <span class="tool-label">URLs</span>
+          <span class="tool-desc">Enlaces y acortadores</span>
+        </button>
+        <button class="tool-card" data-open="mail">
+          <span class="tool-icon">✉️</span>
+          <span class="tool-label">Correo</span>
+          <span class="tool-desc">SPF/DKIM/DMARC</span>
+        </button>
+        <button class="tool-card" data-open="sms">
+          <span class="tool-icon">💬</span>
+          <span class="tool-label">SMS</span>
+          <span class="tool-desc">Smishing</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">Archivos y datos</h2>
+      <div class="grid">
+        <button class="tool-card" data-open="file">
+          <span class="tool-icon">📄</span>
+          <span class="tool-label">Archivos</span>
+          <span class="tool-desc">Magic bytes + hash</span>
+        </button>
+        <button class="tool-card" data-open="exif">
+          <span class="tool-icon">🖼️</span>
+          <span class="tool-label">EXIF</span>
+          <span class="tool-desc">Metadatos de fotos</span>
+        </button>
+        <button class="tool-card" data-open="decode">
+          <span class="tool-icon">🔤</span>
+          <span class="tool-label">Decodificador</span>
+          <span class="tool-desc">Base64 / Hex / URL</span>
+        </button>
+        <button class="tool-card" data-open="secrets">
+          <span class="tool-icon">🕵️</span>
+          <span class="tool-label">Secretos</span>
+          <span class="tool-desc">API keys en código</span>
+        </button>
+        <button class="tool-card" data-open="apps">
+          <span class="tool-icon">📱</span>
+          <span class="tool-label">Apps</span>
+          <span class="tool-desc">APK: permisos + secretos</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="category">
+      <h2 class="category-title">Cuenta y sesión</h2>
+      <div class="grid">
+        <button class="tool-card" data-open="password">
+          <span class="tool-icon">🔑</span>
+          <span class="tool-label">Contraseña</span>
+          <span class="tool-desc">Fuerza offline</span>
+        </button>
+        <button class="tool-card" data-open="jwt">
+          <span class="tool-icon">🪪</span>
+          <span class="tool-label">JWT</span>
+          <span class="tool-desc">Decodificar token</span>
+        </button>
+      </div>
+    </div>
+
+  </section>
+
+  <section id="panel-url" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Verificador de URLs</h1>
+    <p class="hint">Analiza una URL (acortada o no): heurísticas de patrones, typosquatting y homógrafos siempre offline. Resolver el destino final y la edad del dominio requieren red — actívalo abajo si lo necesitas.</p>
+
+    <form id="urlForm" class="row">
+      <input id="urlInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="https://bit.ly/ejemplo" required>
+      <button type="submit">Analizar</button>
+    </form>
+
+    <label class="toggle">
+      <input type="checkbox" id="netToggle">
+      <span>Activar comprobaciones de red (resolver destino final + WHOIS/RDAP)</span>
+    </label>
+    <p class="netwarn" id="netWarn" hidden>
+      Al activarlo, la URL analizada se envía a un proxy CORS público (allorigins.win) y a un servicio RDAP (rdap.org) para resolverla. No se envía nada más de tu dispositivo.
+    </p>
+
+    <div id="urlResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-file" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Comprobador de archivos (magic bytes)</h1>
+    <p class="hint">Lee los primeros bytes del archivo para detectar su tipo real y compararlo con la extensión. Todo ocurre en tu dispositivo — el archivo nunca sale de aquí.</p>
+
+    <div id="dropZone" class="dropzone">
+      <p>Arrastra un archivo aquí, o</p>
+      <label class="filebtn">
+        Elegir archivo
+        <input type="file" id="fileInput" hidden>
+      </label>
+    </div>
+
+    <div id="fileResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-history" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Historial</h1>
+    <p class="hint">Resultados guardados en este dispositivo (nunca se sincronizan). Las contraseñas y JWT no se guardan aquí.</p>
+    <div class="row">
+      <button id="clearHistoryBtn" class="secondary">Borrar todo</button>
+    </div>
+    <div id="historyList" class="history-list"></div>
+  </section>
+
+  <section id="panel-mail" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Análisis de correo</h1>
+    <p class="hint">Pega las cabeceras completas del correo (o el .eml entero) — en Gmail: "Mostrar original"; en Outlook: "Ver origen del mensaje". Se analiza SPF/DKIM/DMARC, coincidencia From/Return-Path/Reply-To y suplantación de marca. Todo offline, texto local.</p>
+    <form id="mailForm">
+      <textarea id="mailInput" rows="8" placeholder="From: ...&#10;Return-Path: ...&#10;Authentication-Results: ...&#10;..." required></textarea>
+      <button type="submit">Analizar cabeceras</button>
+    </form>
+    <div id="mailResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-sms" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Análisis de SMS / mensajes</h1>
+    <p class="hint">Pega el texto del SMS o mensaje sospechoso. Se buscan patrones de smishing: urgencia, ganchos, peticiones de credenciales y enlaces (acortados, typosquat, IP literal…). Todo offline.</p>
+    <form id="smsForm">
+      <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
+      <button type="submit">Analizar mensaje</button>
+    </form>
+    <div id="smsResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-jwt" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>JWT</h1>
+    <p class="hint">Decodifica un JWT (header + payload). No verifica la firma — solo lectura, ideal para inspeccionar tokens sin exponerlos a servicios externos. No se guarda en historial.</p>
+    <form id="jwtForm">
+      <textarea id="jwtInput" rows="4" placeholder="eyJhbGciOi...header.eyJzdWIiOi...payload.firma" required></textarea>
+      <button type="submit">Decodificar</button>
+    </form>
+    <div id="jwtResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-password" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Contraseña</h1>
+    <p class="hint">Estimación de fuerza offline (entropía + patrones comunes). La contraseña no se envía ni se guarda en ningún sitio, ni siquiera en el historial.</p>
+    <div class="row">
+      <input id="passwordInput" type="password" autocomplete="off" placeholder="Escribe una contraseña para probar">
+      <button type="button" id="passwordToggle" class="secondary">Ver</button>
+    </div>
+    <div id="passwordResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-decode" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Decodificador</h1>
+    <p class="hint">Prueba Base64, Base64url, Hex y URL-decode sobre el texto — útil para inspeccionar payloads ofuscados.</p>
+    <form id="decodeForm">
+      <textarea id="decodeInput" rows="4" placeholder="SGVsbG8gbXVuZG8=" required></textarea>
+      <button type="submit">Decodificar</button>
+    </form>
+    <div id="decodeResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-secrets" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Escáner de secretos</h1>
+    <p class="hint">Pega código o config: busca AWS/GitHub/Slack/Stripe/Google keys, tokens, claves privadas y asignaciones tipo <code>api_key=...</code>. Los valores se muestran parcialmente ocultos. No se guarda en historial.</p>
+    <form id="secretsForm">
+      <textarea id="secretsInput" rows="8" placeholder="const AWS_KEY = 'AKIA...'&#10;api_key: 'sk_live_...'" required></textarea>
+      <button type="submit">Escanear</button>
+    </form>
+    <div id="secretsResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-apps" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Apps (APK)</h1>
+    <p class="hint">Sube un .apk: extrae <code>AndroidManifest.xml</code> (paquete + permisos declarados, marcando los peligrosos) y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
+    <div class="dropzone" id="appsDropZone">
+      <p>Arrastra un .apk u otro binario aquí, o</p>
+      <label class="filebtn">
+        Elegir archivo
+        <input type="file" id="appsInput" accept=".apk,.exe,.dylib,.so,application/vnd.android.package-archive" hidden>
+      </label>
+    </div>
+    <div id="appsResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-exif" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>EXIF</h1>
+    <p class="hint">Lee metadatos EXIF de una foto (JPEG): cámara, fecha y — lo más importante antes de compartirla — si lleva coordenadas GPS. Se procesa en tu dispositivo.</p>
+    <div class="dropzone" id="exifDropZone">
+      <p>Arrastra una imagen aquí, o</p>
+      <label class="filebtn">
+        Elegir imagen
+        <input type="file" id="exifInput" accept="image/jpeg" hidden>
+      </label>
+    </div>
+    <div id="exifResult" class="result" hidden></div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <span>100% local · sin cuentas · <span id="netState">red desactivada</span></span>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
