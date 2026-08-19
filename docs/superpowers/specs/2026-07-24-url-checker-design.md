@@ -42,12 +42,20 @@ Heurísticas de smishing sobre texto pegado: listas de palabras de urgencia, pet
 ### Secretos (`js/modules/secretsModule.js`)
 Escáner de secretos sobre texto/código pegado (AppSec): regex por proveedor (AWS, GitHub, GitLab, Slack, Stripe, Google/Firebase, Twilio, SendGrid, Mailgun, npm, bloques de clave privada) más un catch-all genérico `api_key=...`/`secret=...`. Valores mostrados redactados (`AKIA…MNOP`). No se guarda en historial — mismo motivo que Contraseña/JWT.
 
-### Apps (`js/modules/appsModule.js`) — antes "próximamente", ya implementado
-Dos capas, siempre ambas:
-- **v1 — cualquier binario**: extrae strings imprimibles (ASCII y UTF-16LE, como `strings` de Unix) de los primeros 20MB del archivo y corre `scanSecrets` sobre ellas. Funciona con .apk, .exe, .dylib, lo que sea.
-- **v2 — específico de APK**: si el archivo es un ZIP con `AndroidManifest.xml` dentro, lo extrae (`js/zipReader.js`: lector de directorio central ZIP hecho a mano, soporta STORED y DEFLATE vía `DecompressionStream` nativo, sin librería externa) y lo parsea (`js/axmlParser.js`: parser mínimo del formato Android Binary XML — string pool + chunks START_ELEMENT/END_ELEMENT) para sacar `package` y todos los `uses-permission`. Cada permiso se cruza contra una lista de ~19 permisos peligrosos (SMS, cámara, micrófono, accesibilidad, ubicación en segundo plano...) con severidad alta/media.
+### Apps (`js/modules/appsModule.js`) — antes "próximamente", ya implementado (APK + IPA)
+Tres capas:
+- **v1 — cualquier binario**: extrae strings imprimibles (ASCII y UTF-16LE, como `strings` de Unix) de los primeros 20MB del archivo y corre `scanSecrets` sobre ellas. Funciona con .apk, .ipa, .exe, .dylib, lo que sea.
+- **v2 — APK (Android)**: si el ZIP contiene `AndroidManifest.xml`, lo extrae (`js/zipReader.js`: lector de directorio central ZIP hecho a mano, soporta STORED y DEFLATE vía `DecompressionStream` nativo, sin librería externa) y lo parsea (`js/axmlParser.js`: parser mínimo del formato Android Binary XML — string pool + chunks START_ELEMENT/END_ELEMENT) para sacar `package` y todos los `uses-permission`. Cruzado contra ~19 permisos peligrosos (SMS, cámara, micrófono, accesibilidad, ubicación en segundo plano...).
+- **v3 — IPA (iOS)**: si el ZIP tiene `Payload/*.app/Info.plist`, lo extrae y parsea (`js/plistParser.js`: soporta binary plist `bplist00` — formato de objetos/offset-table/trailer típico de builds de Xcode — y plist XML vía `DOMParser` como fallback). `CFBundleIdentifier` = paquete; cualquier clave que termina en `UsageDescription` = permiso declarado (así es como iOS declara permisos: la propia presencia de `NSCameraUsageDescription` etc. es la declaración). Cruzado contra ~18 claves peligrosas equivalentes (cámara, micro, contactos, ubicación siempre, salud...).
 
-Verdict combinado = el peor de (secretos encontrados, permisos peligrosos encontrados). Ambos parsers (`zipReader.js`, `axmlParser.js`) se validaron construyendo ZIP y AXML sintéticos byte a byte en el navegador antes de darlos por buenos — mismo enfoque que el test sintético de EXIF.
+Verdict combinado = el peor de (secretos encontrados, permisos/usage-descriptions peligrosos). Los tres parsers a medida (`zipReader.js`, `axmlParser.js`, `plistParser.js`) se validaron construyendo ZIP/AXML/bplist sintéticos byte a byte en el navegador antes de darlos por buenos — mismo enfoque que el test sintético de EXIF, ahora formalizado en `tests/`.
+
+## Suite de tests de regresión (`tests/`)
+Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES) que importa los módulos reales de `public/js/` y los ejercita contra fixtures sintéticos (`tests/fixtures.js`: JPEG/ZIP/AXML/bplist construidos byte a byte, mismo código que se usó para validar manualmente cada parser durante el desarrollo). Arnés mínimo propio (`tests/harness.js`, `test()`/`assert()`/`runAll()`) — pass/fail visual en la página + consola. Se abre con `python3 -m http.server` desde la raíz del repo o directamente en cualquier navegador.
+
+25 tests cubren los 12 módulos. La suite ya encontró y arregló 2 bugs reales:
+- `getKnownDomains()` en `urlModule.js` hacía `fetch("data/known-domains.json")` relativo al **documento** que importa el módulo — funcionaba desde `public/index.html` pero rompía (404 silencioso → lista vacía) al importarlo desde `tests/`. Arreglado con `fetch(new URL("../../data/known-domains.json", import.meta.url))`, relativo al **módulo**, correcto sin importar quién lo importe.
+- El umbral de typosquat (Levenshtein ≤2) generaba falsos positivos entre marcas legítimas cercanas entre sí en `known-domains.json` (github.com/gitlab.com, x.com/t.co, x.com/vk.com, todas a distancia 2). Bajado a ≤1 — sigue cazando sustituciones de un carácter (`goog1e.com`, `paypa1.com`) sin colisionar con las ~60 marcas de la lista.
 
 ### Iconos
 `icons/icon-180.png` (apple-touch-icon), `icons/icon-192.png` y `icons/icon-512.png` (manifest, `any`+`maskable`) generados desde `icon.svg` vía `qlmanage -t` (no había rasterizador SVG en el entorno) + `sips` para el resize final. El SVG original se mantiene como icono vectorial primario (`rel="icon"`).
@@ -56,7 +64,6 @@ Verdict combinado = el peor de (secretos encontrados, permisos peligrosos encont
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
 ## Fuera de alcance (futuro)
-- IPA (iOS) — Apps solo cubre APK por ahora, IPA también es ZIP pero con Info.plist (formato distinto, no AXML)
 - Integración VirusTotal / Google Safe Browsing (requiere API key)
 - Timeline hop-a-hop completa de redirects (requeriría proxy propio, no genérico)
 - Sync de historial entre dispositivos (queda local al dispositivo/navegador)
@@ -83,7 +90,7 @@ Shell: navegación por tabs, monta/desmonta el módulo activo, registra el Servi
   - `@` en la URL
   - Exceso de guiones/subdominios (>3)
   - Punycode/homógrafo (`xn--` en host, o mezcla de scripts unicode sospechosa)
-  - Typosquatting: distancia Levenshtein ≤2 contra `data/known-domains.json` (~50-100 dominios top)
+  - Typosquatting: distancia Levenshtein ≤1 contra `data/known-domains.json` (~50-100 dominios top)
 - Heurísticas opt-in (toggle "activar comprobaciones de red", off por defecto):
   - Resolver destino final vía allorigins (timeout 6s, error → `null`, flag `resolve_failed`)
   - Edad de dominio vía RDAP (timeout 5s, error → `null`, no penaliza)
@@ -104,7 +111,7 @@ Base 0 (safe). Suma por flag detectado:
 | Flag | Puntos | Modo |
 |---|---|---|
 | Punycode/homógrafo | +50 | offline |
-| Typosquat match (Levenshtein ≤2) | +50 | offline |
+| Typosquat match (Levenshtein ≤1) | +50 | offline |
 | IP literal como host | +40 | offline |
 | `@` en URL | +30 | offline |
 | Sin HTTPS | +30 | offline |

@@ -77,7 +77,7 @@
         <button class="tool-card" data-open="apps">
           <span class="tool-icon">📱</span>
           <span class="tool-label">Apps</span>
-          <span class="tool-desc">APK: permisos + secretos</span>
+          <span class="tool-desc">APK/IPA: permisos + secretos</span>
         </button>
       </div>
     </div>
@@ -216,13 +216,13 @@
 
   <section id="panel-apps" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Apps (APK)</h1>
-    <p class="hint">Sube un .apk: extrae <code>AndroidManifest.xml</code> (paquete + permisos declarados, marcando los peligrosos) y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
+    <h1>Apps (APK / IPA)</h1>
+    <p class="hint">Sube un .apk o .ipa: extrae el manifest (<code>AndroidManifest.xml</code> o <code>Info.plist</code>) — paquete + permisos declarados, marcando los peligrosos — y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
     <div class="dropzone" id="appsDropZone">
-      <p>Arrastra un .apk u otro binario aquí, o</p>
+      <p>Arrastra un .apk, .ipa u otro binario aquí, o</p>
       <label class="filebtn">
         Elegir archivo
-        <input type="file" id="appsInput" accept=".apk,.exe,.dylib,.so,application/vnd.android.package-archive" hidden>
+        <input type="file" id="appsInput" accept=".apk,.ipa,.exe,.dylib,.so,application/vnd.android.package-archive" hidden>
       </label>
     </div>
     <div id="appsResult" class="result" hidden></div>

@@ -28,7 +28,7 @@ let knownDomainsCache = null;
 async function getKnownDomains() {
   if (knownDomainsCache) return knownDomainsCache;
   try {
-    const res = await fetch("data/known-domains.json");
+    const res = await fetch(new URL("../../data/known-domains.json", import.meta.url));
     knownDomainsCache = await res.json();
   } catch {
     knownDomainsCache = [];
@@ -73,7 +73,7 @@ function offlineHeuristics(url, knownDomains) {
   for (const known of knownDomains) {
     if (bareHost === known) continue;
     const dist = levenshtein(bareHost, known);
-    if (dist > 0 && dist <= 2) {
+    if (dist > 0 && dist <= 1) {
       flags.push("typosquat");
       break;
     }

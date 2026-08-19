@@ -2,6 +2,28 @@ import { scanSecrets } from "./secretsModule.js";
 import { saveResult } from "../db.js";
 import { listZipEntries, extractZipEntry } from "../zipReader.js";
 import { parseManifest } from "../axmlParser.js";
+import { parsePlist } from "../plistParser.js";
+
+const DANGEROUS_USAGE_DESCRIPTIONS = {
+  NSCameraUsageDescription: "high",
+  NSMicrophoneUsageDescription: "high",
+  NSContactsUsageDescription: "high",
+  NSLocationAlwaysAndWhenInUseUsageDescription: "high",
+  NSLocationAlwaysUsageDescription: "high",
+  NSHealthShareUsageDescription: "high",
+  NSHealthUpdateUsageDescription: "high",
+  NSSpeechRecognitionUsageDescription: "high",
+  NSLocationWhenInUseUsageDescription: "medium",
+  NSPhotoLibraryUsageDescription: "medium",
+  NSPhotoLibraryAddUsageDescription: "medium",
+  NSBluetoothAlwaysUsageDescription: "medium",
+  NSBluetoothPeripheralUsageDescription: "medium",
+  NSFaceIDUsageDescription: "medium",
+  NSCalendarsUsageDescription: "medium",
+  NSRemindersUsageDescription: "medium",
+  NSMotionUsageDescription: "medium",
+  NSAppleMusicUsageDescription: "medium",
+};
 
 const DANGEROUS_PERMISSIONS = {
   "android.permission.READ_SMS": "high",
@@ -81,10 +103,10 @@ async function scanStringsAndSecrets(file) {
   return { stringCount: ascii.length + utf16.length, truncated, findings, verdict, riskScore };
 }
 
-function scoreManifest(permissions) {
+function scoreManifest(permissions, severityMap) {
   const flagged = permissions
-    .filter((p) => DANGEROUS_PERMISSIONS[p])
-    .map((p) => ({ name: p, severity: DANGEROUS_PERMISSIONS[p] }));
+    .filter((p) => severityMap[p])
+    .map((p) => ({ name: p, severity: severityMap[p] }));
   const highCount = flagged.filter((f) => f.severity === "high").length;
   const medCount = flagged.filter((f) => f.severity === "medium").length;
   const riskScore = Math.min(100, highCount * 25 + medCount * 10);
@@ -92,7 +114,9 @@ function scoreManifest(permissions) {
   return { flagged, riskScore, verdict };
 }
 
-async function tryParseApk(file) {
+const IPA_INFO_PLIST_RE = /^Payload\/[^/]+\.app\/Info\.plist$/;
+
+async function tryParsePackage(file) {
   const buf = await file.arrayBuffer();
   let entries;
   try {
@@ -100,16 +124,38 @@ async function tryParseApk(file) {
   } catch {
     return { isZip: false };
   }
-  const manifestEntry = entries.get("AndroidManifest.xml");
-  if (!manifestEntry) return { isZip: true, isApk: false, entryCount: entries.size };
 
-  try {
-    const manifestBytes = await extractZipEntry(buf, manifestEntry);
-    const { package: pkg, permissions } = parseManifest(manifestBytes.buffer);
-    return { isZip: true, isApk: true, entryCount: entries.size, package: pkg, permissions };
-  } catch (err) {
-    return { isZip: true, isApk: false, entryCount: entries.size, manifestError: err.message };
+  const manifestEntry = entries.get("AndroidManifest.xml");
+  if (manifestEntry) {
+    try {
+      const manifestBytes = await extractZipEntry(buf, manifestEntry);
+      const { package: pkg, permissions } = parseManifest(manifestBytes.buffer);
+      return { isZip: true, platform: "android", entryCount: entries.size, package: pkg, permissions, severityMap: DANGEROUS_PERMISSIONS };
+    } catch (err) {
+      return { isZip: true, platform: null, entryCount: entries.size, manifestError: err.message };
+    }
   }
+
+  const plistName = [...entries.keys()].find((n) => IPA_INFO_PLIST_RE.test(n));
+  if (plistName) {
+    try {
+      const plistBytes = await extractZipEntry(buf, entries.get(plistName));
+      const plist = parsePlist(plistBytes.buffer);
+      const permissions = Object.keys(plist || {}).filter((k) => k.endsWith("UsageDescription"));
+      return {
+        isZip: true,
+        platform: "ios",
+        entryCount: entries.size,
+        package: plist?.CFBundleIdentifier || null,
+        permissions,
+        severityMap: DANGEROUS_USAGE_DESCRIPTIONS,
+      };
+    } catch (err) {
+      return { isZip: true, platform: null, entryCount: entries.size, manifestError: err.message };
+    }
+  }
+
+  return { isZip: true, platform: null, entryCount: entries.size };
 }
 
 function worseVerdict(a, b) {
@@ -118,27 +164,27 @@ function worseVerdict(a, b) {
 }
 
 export async function checkApp(file) {
-  const [strings, apk] = await Promise.all([scanStringsAndSecrets(file), tryParseApk(file)]);
+  const [strings, pkg] = await Promise.all([scanStringsAndSecrets(file), tryParsePackage(file)]);
 
   let manifestScore = { flagged: [], riskScore: 0, verdict: "safe" };
-  if (apk.isApk && apk.permissions) manifestScore = scoreManifest(apk.permissions);
+  if (pkg.platform && pkg.permissions) manifestScore = scoreManifest(pkg.permissions, pkg.severityMap);
 
   const verdict = worseVerdict(strings.verdict, manifestScore.verdict);
   const riskScore = Math.max(strings.riskScore, manifestScore.riskScore);
 
   const flagLabels = [
     ...strings.findings.map((f) => f.name),
-    ...manifestScore.flagged.map((f) => `Permiso peligroso: ${f.name}`),
+    ...manifestScore.flagged.map((f) => `${pkg.platform === "ios" ? "Permiso (uso declarado)" : "Permiso peligroso"}: ${f.name}`),
   ];
 
   const result = {
     type: "app",
     input: file.name,
     size: file.size,
-    isZip: apk.isZip,
-    isApk: apk.isApk,
-    package: apk.package || null,
-    permissions: apk.permissions || [],
+    isZip: pkg.isZip,
+    platform: pkg.platform || null,
+    package: pkg.package || null,
+    permissions: pkg.permissions || [],
     dangerousPermissions: manifestScore.flagged,
     secretFindings: strings.findings,
     stringCount: strings.stringCount,

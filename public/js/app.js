@@ -409,8 +409,9 @@ function initAppsTool() {
       const meta = [];
       if (r.package) meta.push(`Paquete: ${r.package}`);
       meta.push(`${(r.size / 1024).toFixed(1)} KB`);
-      if (r.isApk) meta.push(`${r.permissions.length} permisos declarados`);
-      else if (r.isZip) meta.push("ZIP sin AndroidManifest.xml (no es un APK)");
+      if (r.platform === "android") meta.push(`APK · ${r.permissions.length} permisos declarados`);
+      else if (r.platform === "ios") meta.push(`IPA · ${r.permissions.length} permisos declarados`);
+      else if (r.isZip) meta.push("ZIP sin manifest reconocido (no es APK ni IPA)");
       else meta.push("Binario (no ZIP)");
 
       const permItems = r.dangerousPermissions.map(
