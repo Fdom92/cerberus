@@ -95,6 +95,11 @@
           <span class="tool-label">JWT</span>
           <span class="tool-desc">Decodificar token</span>
         </button>
+        <button class="tool-card" data-open="webrtc">
+          <span class="tool-icon">📡</span>
+          <span class="tool-label">Fuga WebRTC</span>
+          <span class="tool-desc">¿Tu VPN filtra tu IP?</span>
+        </button>
       </div>
     </div>
 
@@ -201,6 +206,15 @@
       <button type="submit">Decodificar</button>
     </form>
     <div id="jwtResult" class="result" hidden></div>
+  </section>
+
+  <section id="panel-webrtc" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>Fuga WebRTC / VPN</h1>
+    <p class="hint">Cualquier web puede usar WebRTC para preguntarle a tu navegador tu IP local y tu IP pública vista por un servidor STUN — sin permiso, sin aviso. Si usas VPN, esa consulta a veces se salta el túnel y revela tu IP real. Esta comprobación hace lo mismo a propósito y lo compara contra tu IP pública vista por una petición HTTPS normal (que sí pasa por la VPN), para que veas si hay discrepancia.</p>
+    <p class="netwarn">Al pulsar, tu navegador contacta <strong>stun.l.google.com</strong> (STUN) y <strong>api.ipify.org</strong> (IP pública) para comparar. No se guarda nada en historial — es información sobre ti, no un archivo o mensaje externo.</p>
+    <button type="button" id="webrtcRun">🔍 Ejecutar comprobación</button>
+    <div id="webrtcResult" class="result" hidden></div>
   </section>
 
   <section id="panel-password" class="panel">

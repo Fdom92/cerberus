@@ -63,6 +63,9 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Fuga WebRTC / VPN (`js/modules/webrtcModule.js`)
+Único módulo que es **inherentemente de red** — no tiene modo offline, así que no lleva toggle sino un botón de acción explícita con aviso de qué contacta (`stun.l.google.com` + `api.ipify.org`). Crea un `RTCPeerConnection` con ese STUN, recoge candidatos ICE (`host` = IP local, `srflx` = IP pública vista por el STUN, filtrando alias `.local` de mDNS) y en paralelo pide la IP pública por una petición HTTPS normal (`api.ipify.org`). Si la IP vista por STUN difiere de la vista por HTTPS → flag `public_ip_leak` (STUN se salta el túnel VPN, la web ve tu IP real aunque la conexión normal muestre la de la VPN). Igual que Contraseña/JWT: **no se guarda en historial**, es información sobre el propio usuario, no un artefacto externo que analizar. Sin tests automatizados en `tests/` — mockear `RTCPeerConnection` no compensa frente a probarlo contra el STUN real, que es lo que se hizo manualmente antes de dar el módulo por bueno.
+
 ## Botones de ejemplo ("Probar seguro" / "Probar malicioso")
 Cada panel de herramienta tiene 1-2 botones que rellenan (y para formularios, envían) un caso de ejemplo, para probar la app sin tener que buscar/crear datos de prueba. Todo en `js/sampleData.js`:
 - **Texto** (URLs, Correo, SMS, JWT, Decodificador, Secretos, Contraseña): strings hardcoded, botón rellena el campo y dispara `submit`/`input`.

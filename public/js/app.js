@@ -8,6 +8,7 @@ import { decodeAll } from "./modules/decodeModule.js";
 import { parseExif } from "./modules/exifModule.js";
 import { scanSecrets } from "./modules/secretsModule.js";
 import { checkApp } from "./modules/appsModule.js";
+import { checkWebRtcLeak, WEBRTC_FLAG_LABELS } from "./modules/webrtcModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
 import {
   SAMPLES,
@@ -26,6 +27,7 @@ const ALL_FLAG_LABELS = {
   ...SMS_FLAG_LABELS,
   ...JWT_FLAG_LABELS,
   ...PASSWORD_FLAG_LABELS,
+  ...WEBRTC_FLAG_LABELS,
 };
 const NET_PREF_KEY = "cerberus_net_enabled";
 
@@ -485,6 +487,40 @@ function initAppsTool() {
   document.getElementById("sampleAppsIpa").addEventListener("click", () => handle(sampleSpywareIpaFile()));
 }
 
+// ---- WebRTC leak tool ----
+function initWebrtcTool() {
+  const btn = document.getElementById("webrtcRun");
+  const resultEl = document.getElementById("webrtcResult");
+
+  btn.addEventListener("click", async () => {
+    if (typeof RTCPeerConnection === "undefined") {
+      resultEl.hidden = false;
+      resultEl.innerHTML = `<p class="hint">Este navegador no soporta WebRTC — no se puede comprobar.</p>`;
+      return;
+    }
+    resultEl.hidden = false;
+    btn.disabled = true;
+    resultEl.innerHTML = '<p class="hint">Consultando STUN y servicio de IP pública…</p>';
+    try {
+      const r = await checkWebRtcLeak();
+      const meta = [];
+      meta.push(`IP local: ${r.localIps.length ? r.localIps.join(", ") : "ninguna detectada"}`);
+      meta.push(`IP pública (STUN): ${r.stunIps.length ? r.stunIps.join(", ") : "ninguna detectada"}`);
+      meta.push(`IP pública (HTTPS normal): ${r.publicIpViaHttps || "no disponible"}`);
+      const verdictLabel = r.verdict === "unknown" ? "sin datos suficientes" : r.verdict;
+      resultEl.innerHTML = `
+        <span class="verdict ${r.verdict}">${escapeHtml(verdictLabel)}</span>
+        <ul class="flags">${flagsHtml(r.flags, "Sin señales de fuga")}</ul>
+        <div class="meta">${meta.map(escapeHtml).join(" · ")}</div>
+      `;
+    } catch (err) {
+      resultEl.innerHTML = `<p class="hint">No se pudo completar la comprobación: ${escapeHtml(err.message || String(err))}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 // ---- History ----
 let historyWired = false;
 async function historyRefresh() {
@@ -518,4 +554,5 @@ initDecodeTool();
 initSecretsTool();
 initExifTool();
 initAppsTool();
+initWebrtcTool();
 registerSw();
