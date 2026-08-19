@@ -67,3 +67,32 @@ export const PASSWORD_FLAG_LABELS = {
   repeated_chars: "Contiene el mismo carácter repetido 3+ veces seguidas",
   too_short: "Menos de 8 caracteres",
 };
+
+async function sha1Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-1", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+// k-anonymity: solo se envían los primeros 5 caracteres del hash SHA-1, nunca la contraseña.
+// https://haveibeenpwned.com/API/v3#PwnedPasswords
+export async function checkPwnedPassword(pw) {
+  const hash = await sha1Hex(pw);
+  const prefix = hash.slice(0, 5);
+  const suffix = hash.slice(5);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, { signal: controller.signal });
+    if (!res.ok) throw new Error("respuesta no válida");
+    const text = await res.text();
+    const line = text.split("\n").find((l) => l.startsWith(suffix));
+    const count = line ? parseInt(line.split(":")[1], 10) : 0;
+    return { checked: true, count, pwned: count > 0 };
+  } catch {
+    return { checked: false, count: 0, pwned: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -48,6 +48,11 @@
           <span class="tool-label">SMS</span>
           <span class="tool-desc">Smishing</span>
         </button>
+        <button class="tool-card" data-open="dns">
+          <span class="tool-icon">🌐</span>
+          <span class="tool-label">DNS / SPF</span>
+          <span class="tool-desc">¿Tiene SPF/DMARC un dominio?</span>
+        </button>
       </div>
     </div>
 
@@ -193,6 +198,17 @@
     <div id="smsResult" class="result" hidden></div>
   </section>
 
+  <section id="panel-dns" class="panel">
+    <button class="back-btn" data-back>← Inicio</button>
+    <h1>DNS / SPF de un dominio</h1>
+    <p class="hint">Comprueba si un dominio tiene SPF y DMARC configurados — sin esto, es más fácil falsificar correos "de" ese dominio. Útil para verificar el tuyo propio o el de una empresa que te escribió. Consulta DNS pública (Cloudflare) — el dominio nunca se guarda salvo el propio resultado en tu historial.</p>
+    <form id="dnsForm" class="row">
+      <input id="dnsInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ejemplo.com" required>
+      <button type="submit">Comprobar</button>
+    </form>
+    <div id="dnsResult" class="result" hidden></div>
+  </section>
+
   <section id="panel-jwt" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>JWT</h1>
@@ -230,6 +246,12 @@
       <button type="button" id="passwordToggle" class="secondary">Ver</button>
     </div>
     <div id="passwordResult" class="result" hidden></div>
+
+    <div id="pwnedSection" hidden>
+      <button type="button" id="pwnedCheckBtn" class="secondary">🔍 Comprobar si está filtrada (Have I Been Pwned)</button>
+      <p class="netwarn">Envía solo los primeros 5 caracteres del hash SHA-1 de la contraseña a <strong>api.pwnedpasswords.com</strong> — la contraseña en sí nunca sale del dispositivo (k-anonimity). No se guarda en historial.</p>
+      <div id="pwnedResult" class="result" hidden></div>
+    </div>
   </section>
 
   <section id="panel-decode" class="panel">

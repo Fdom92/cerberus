@@ -3,12 +3,13 @@ import { checkFile, FILE_FLAG_LABELS } from "./modules/fileModule.js";
 import { checkMail, MAIL_FLAG_LABELS } from "./modules/mailModule.js";
 import { checkSms, SMS_FLAG_LABELS } from "./modules/smsModule.js";
 import { decodeJwt, JWT_FLAG_LABELS } from "./modules/jwtModule.js";
-import { estimatePassword, PASSWORD_FLAG_LABELS } from "./modules/passwordModule.js";
+import { estimatePassword, checkPwnedPassword, PASSWORD_FLAG_LABELS } from "./modules/passwordModule.js";
 import { decodeAll } from "./modules/decodeModule.js";
 import { parseExif } from "./modules/exifModule.js";
 import { scanSecrets } from "./modules/secretsModule.js";
 import { checkApp } from "./modules/appsModule.js";
 import { checkWebRtcLeak, WEBRTC_FLAG_LABELS } from "./modules/webrtcModule.js";
+import { checkDns, DNS_FLAG_LABELS } from "./modules/dnsModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
 import {
   SAMPLES,
@@ -28,6 +29,7 @@ const ALL_FLAG_LABELS = {
   ...JWT_FLAG_LABELS,
   ...PASSWORD_FLAG_LABELS,
   ...WEBRTC_FLAG_LABELS,
+  ...DNS_FLAG_LABELS,
 };
 const NET_PREF_KEY = "cerberus_net_enabled";
 
@@ -270,6 +272,35 @@ function initSmsForm() {
   wireSample("sampleSmsMalicious", input, SAMPLES.smsMalicious, form);
 }
 
+// ---- DNS/SPF tool ----
+function initDnsForm() {
+  const form = document.getElementById("dnsForm");
+  const input = document.getElementById("dnsInput");
+  const resultEl = document.getElementById("dnsResult");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const raw = input.value.trim();
+    if (!raw) return;
+    resultEl.hidden = false;
+    resultEl.innerHTML = '<p class="hint">Consultando DNS…</p>';
+    try {
+      const r = await checkDns(raw);
+      const meta = [`Dominio: ${r.domain}`, `MX: ${r.mxCount}`];
+      resultEl.innerHTML = `
+        <span class="verdict ${r.verdict}">${r.verdict}</span>
+        <div class="score">Riesgo: ${r.riskScore} / 100</div>
+        <ul class="flags">${flagsHtml(r.flags)}</ul>
+        <div class="meta">${meta.map(escapeHtml).join(" · ")}</div>
+        ${r.spf ? `<div class="meta mono">SPF: ${escapeHtml(r.spf)}</div>` : ""}
+        ${r.dmarc ? `<div class="meta mono">DMARC: ${escapeHtml(r.dmarc)}</div>` : ""}
+      `;
+    } catch (err) {
+      resultEl.innerHTML = `<p class="hint">No se pudo consultar: ${escapeHtml(err.message || String(err))}</p>`;
+    }
+  });
+}
+
 // ---- JWT tool ----
 function initJwtTool() {
   const form = document.getElementById("jwtForm");
@@ -303,6 +334,9 @@ function initPasswordTool() {
   const input = document.getElementById("passwordInput");
   const toggle = document.getElementById("passwordToggle");
   const resultEl = document.getElementById("passwordResult");
+  const pwnedSection = document.getElementById("pwnedSection");
+  const pwnedBtn = document.getElementById("pwnedCheckBtn");
+  const pwnedResultEl = document.getElementById("pwnedResult");
 
   toggle.addEventListener("click", () => {
     input.type = input.type === "password" ? "text" : "password";
@@ -310,11 +344,14 @@ function initPasswordTool() {
   });
 
   input.addEventListener("input", () => {
+    pwnedResultEl.hidden = true;
     if (!input.value) {
       resultEl.hidden = true;
+      pwnedSection.hidden = true;
       return;
     }
     resultEl.hidden = false;
+    pwnedSection.hidden = false;
     const { entropy, category, flags, length } = estimatePassword(input.value);
     const pct = Math.min(100, Math.round((entropy / 80) * 100));
     const verdictClass = entropy < 28 ? "dangerous" : entropy < 60 ? "suspicious" : "safe";
@@ -326,6 +363,31 @@ function initPasswordTool() {
       </div>
       <ul class="flags">${flagsHtml(flags, "Sin patrones débiles detectados")}</ul>
     `;
+  });
+
+  pwnedBtn.addEventListener("click", async () => {
+    if (!input.value) return;
+    pwnedResultEl.hidden = false;
+    pwnedBtn.disabled = true;
+    pwnedResultEl.innerHTML = '<p class="hint">Consultando…</p>';
+    try {
+      const { checked, count, pwned } = await checkPwnedPassword(input.value);
+      if (!checked) {
+        pwnedResultEl.innerHTML = `<p class="hint">No se pudo consultar el servicio (sin red o timeout).</p>`;
+      } else if (pwned) {
+        pwnedResultEl.innerHTML = `
+          <span class="verdict dangerous">filtrada</span>
+          <div class="score">Aparece en ${count.toLocaleString("es-ES")} brechas conocidas — no la reutilices</div>
+        `;
+      } else {
+        pwnedResultEl.innerHTML = `
+          <span class="verdict safe">no encontrada</span>
+          <div class="score">No aparece en el listado de contraseñas filtradas conocidas</div>
+        `;
+      }
+    } finally {
+      pwnedBtn.disabled = false;
+    }
   });
 
   wireSample("samplePasswordWeak", input, SAMPLES.passwordWeak);
@@ -542,12 +604,38 @@ function registerSw() {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+// ---- Share target (Android "Compartir" -> Cerberus) ----
+function handleShareTarget() {
+  const params = new URLSearchParams(location.search);
+  const sharedUrl = params.get("url");
+  const sharedText = params.get("text");
+  if (!sharedUrl && !sharedText) return;
+
+  history.replaceState(null, "", location.pathname);
+
+  const looksLikeUrl = (s) => /^https?:\/\/\S+$/i.test(s.trim());
+  const candidate = sharedUrl || sharedText;
+
+  if (looksLikeUrl(candidate)) {
+    showPanel("url");
+    const input = document.getElementById("urlInput");
+    input.value = candidate.trim();
+    document.getElementById("urlForm").requestSubmit();
+  } else {
+    showPanel("sms");
+    const input = document.getElementById("smsInput");
+    input.value = candidate;
+    document.getElementById("smsForm").requestSubmit();
+  }
+}
+
 initNav();
 initNetToggle();
 initUrlForm();
 initFileModule();
 initMailForm();
 initSmsForm();
+initDnsForm();
 initJwtTool();
 initPasswordTool();
 initDecodeTool();
@@ -556,3 +644,4 @@ initExifTool();
 initAppsTool();
 initWebrtcTool();
 registerSw();
+handleShareTarget();

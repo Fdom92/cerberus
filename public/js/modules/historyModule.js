@@ -3,14 +3,15 @@ import { FLAG_LABELS } from "./urlModule.js";
 import { FILE_FLAG_LABELS } from "./fileModule.js";
 import { MAIL_FLAG_LABELS } from "./mailModule.js";
 import { SMS_FLAG_LABELS } from "./smsModule.js";
+import { DNS_FLAG_LABELS } from "./dnsModule.js";
 
-const ALL_LABELS = { ...FLAG_LABELS, ...FILE_FLAG_LABELS, ...MAIL_FLAG_LABELS, ...SMS_FLAG_LABELS };
+const ALL_LABELS = { ...FLAG_LABELS, ...FILE_FLAG_LABELS, ...MAIL_FLAG_LABELS, ...SMS_FLAG_LABELS, ...DNS_FLAG_LABELS };
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleString();
 }
 
-const TYPE_ICONS = { url: "🔗", file: "📄", mail: "✉️", sms: "💬" };
+const TYPE_ICONS = { url: "🔗", file: "📄", mail: "✉️", sms: "💬", app: "📱", dns: "🌐" };
 function typeIcon(type) {
   return TYPE_ICONS[type] || "•";
 }
