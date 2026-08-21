@@ -40,6 +40,8 @@ const DANGEROUS_PERMISSIONS = {
   "android.permission.REQUEST_INSTALL_PACKAGES": "high",
   "android.permission.READ_CONTACTS": "high",
   "android.permission.ACCESS_BACKGROUND_LOCATION": "high",
+  "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE": "high",
+  "android.permission.QUERY_ALL_PACKAGES": "high",
   "android.permission.ACCESS_FINE_LOCATION": "medium",
   "android.permission.ACCESS_COARSE_LOCATION": "medium",
   "android.permission.READ_PHONE_STATE": "medium",

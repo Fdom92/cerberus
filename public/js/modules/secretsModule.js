@@ -12,6 +12,8 @@ const PATTERNS = [
   { name: "SendGrid API key", severity: "high", re: /SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}/g },
   { name: "Mailgun API key", severity: "high", re: /key-[0-9a-zA-Z]{32}/g },
   { name: "npm token", severity: "high", re: /npm_[A-Za-z0-9]{36}/g },
+  { name: "Anthropic API key", severity: "high", re: /sk-ant-(?:api\d{2}-)?[A-Za-z0-9_-]{20,}/g },
+  { name: "OpenAI API key", severity: "high", re: /sk-[A-Za-z0-9]{20,}/g },
   { name: "Private key block", severity: "high", re: /-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/g },
   { name: "Bearer token en cabecera", severity: "medium", re: /Authorization:\s*Bearer\s+[A-Za-z0-9\-._~+/]{20,}/gi },
   { name: "JWT embebido", severity: "medium", re: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },

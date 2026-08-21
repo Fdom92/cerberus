@@ -11,7 +11,6 @@ export const JWT_FLAG_LABELS = {
   expired: "El token ya expiró (exp en el pasado)",
   not_yet_valid: "El token aún no es válido (nbf en el futuro)",
   no_exp: "El token no tiene fecha de expiración (exp) — nunca caduca",
-  weak_alg: "Algoritmo débil o poco recomendado",
 };
 
 export function decodeJwt(token) {
@@ -26,7 +25,6 @@ export function decodeJwt(token) {
   const now = Math.floor(Date.now() / 1000);
 
   if ((header.alg || "").toLowerCase() === "none") flags.push("alg_none");
-  else if (["hs1", "rs1", "none"].includes((header.alg || "").toLowerCase())) flags.push("weak_alg");
 
   if (payload.exp !== undefined) {
     if (payload.exp < now) flags.push("expired");

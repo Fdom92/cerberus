@@ -1,5 +1,7 @@
 import { saveResult } from "../db.js";
 import { offlineUrlFlags, FLAG_LABELS as URL_FLAG_LABELS, FLAG_POINTS as URL_FLAG_POINTS } from "./urlModule.js";
+import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../textHeuristics.js";
+import { BRAND_DOMAINS } from "../brandDomains.js";
 
 const URGENCY_WORDS = [
   "urgente", "urgent", "inmediat", "immediat", "suspendid", "suspended",
@@ -20,36 +22,10 @@ const LURE_WORDS = [
   "impago", "unpaid",
 ];
 
-// Registro/aviso "oficial" vago — muy común en smishing que suplanta administraciones públicas
-// (Seg. Social, Correos, DGT, Agencia Tributaria): tono burocrático en vez de urgencia agresiva.
-const OFFICIAL_NOTICE_WORDS = [
-  "actualizacion pendiente", "tramite pendiente", "gestione el tramite", "gestione su tramite",
-  "consulte su informacion", "notificacion pendiente", "aviso importante", "accion requerida",
-  "action required", "pending procedure", "gestion pendiente",
+const SHORTENERS = [
+  "bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly", "buff.ly", "rebrand.ly",
+  "cutt.ly", "bit.do", "tiny.cc", "shorturl.at", "s.id", "rb.gy", "v.gd", "tr.im", "shrtco.de", "x.co",
 ];
-
-const SHORTENERS = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly", "buff.ly", "rebrand.ly"];
-
-// Marca mencionada en el texto -> dominio real esperado. Si el mensaje nombra la marca
-// pero el enlace no apunta a ese dominio, es spoofing casi seguro (ver mailModule.js para el mismo patrón sobre From).
-const BRAND_DOMAINS = {
-  "seg social": "seg-social.es",
-  "seguridad social": "seg-social.es",
-  "correos": "correos.es",
-  "dgt": "dgt.es",
-  "agencia tributaria": "agenciatributaria.gob.es",
-  "hacienda": "agenciatributaria.gob.es",
-  "bbva": "bbva.com",
-  "santander": "santander.com",
-  "caixabank": "caixabank.com",
-  "paypal": "paypal.com",
-  "amazon": "amazon.es",
-  "dhl": "dhl.com",
-  "ups": "ups.com",
-  "fedex": "fedex.com",
-  "netflix": "netflix.com",
-  "whatsapp": "whatsapp.com",
-};
 
 const FLAG_POINTS = {
   brand_domain_mismatch: 40,
@@ -73,30 +49,11 @@ export const SMS_FLAG_LABELS = {
   ...URL_FLAG_LABELS,
 };
 
-function normalize(s) {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
-
-function extractUrls(text) {
-  const matches = text.match(/\bhttps?:\/\/[^\s<>"')]+/gi) || [];
-  const bare = text.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>"')]*)?/gi) || [];
-  const all = [...matches];
-  for (const b of bare) {
-    if (!matches.some((m) => m.includes(b))) all.push(b);
-  }
-  return [...new Set(all)];
-}
-
-function matchesAny(text, words) {
-  const norm = normalize(text);
-  return words.some((w) => norm.includes(normalize(w)));
-}
-
 function mentionedBrandDomains(text) {
   const norm = normalize(text);
   return Object.entries(BRAND_DOMAINS)
     .filter(([brand]) => norm.includes(normalize(brand)))
-    .map(([, domain]) => domain);
+    .flatMap(([, domains]) => domains);
 }
 
 export async function checkSms(rawText) {

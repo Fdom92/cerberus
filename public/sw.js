@@ -1,4 +1,4 @@
-const CACHE = "cerberus-v7";
+const CACHE = "cerberus-v8";
 const SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const SHELL = [
   "./js/app.js",
   "./js/db.js",
   "./js/magicBytes.js",
+  "./js/brandDomains.js",
+  "./js/textHeuristics.js",
   "./js/zipReader.js",
   "./js/axmlParser.js",
   "./js/plistParser.js",

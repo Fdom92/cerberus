@@ -1,54 +1,46 @@
 import { saveResult } from "../db.js";
+import { offlineUrlFlags, FLAG_LABELS as URL_FLAG_LABELS, FLAG_POINTS as URL_FLAG_POINTS } from "./urlModule.js";
+import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../textHeuristics.js";
+import { BRAND_DOMAINS } from "../brandDomains.js";
 
 const FLAG_POINTS = {
   display_name_spoof: 50,
+  brand_domain_mismatch: 40,
   spf_fail: 30,
   dkim_fail: 30,
   dmarc_fail: 30,
   reply_to_mismatch: 25,
   from_returnpath_mismatch: 20,
+  official_notice_language: 20,
   spf_missing: 15,
   dkim_missing: 15,
   dmarc_missing: 15,
   auth_results_missing: 10,
+  ...URL_FLAG_POINTS,
 };
 
 export const MAIL_FLAG_LABELS = {
   display_name_spoof: "El nombre mostrado imita una marca conocida pero el dominio real no coincide",
+  brand_domain_mismatch: "El cuerpo menciona una entidad conocida pero sus enlaces no apuntan a su dominio real",
   spf_fail: "SPF falló — el servidor de envío no está autorizado por el dominio",
   dkim_fail: "DKIM falló — la firma criptográfica del mensaje no es válida",
   dmarc_fail: "DMARC falló — no cumple la política de autenticación del dominio",
   reply_to_mismatch: "Reply-To apunta a un dominio distinto de From — las respuestas van a otro sitio",
   from_returnpath_mismatch: "From y Return-Path tienen dominios distintos",
+  official_notice_language: "Tono de aviso oficial/burocrático vago ('trámite pendiente') sin detalles verificables",
   spf_missing: "No se encontró resultado SPF en las cabeceras",
   dkim_missing: "No se encontró resultado DKIM en las cabeceras",
   dmarc_missing: "No se encontró resultado DMARC en las cabeceras",
   auth_results_missing: "No hay cabecera Authentication-Results — no se puede verificar SPF/DKIM/DMARC",
+  ...URL_FLAG_LABELS,
 };
 
-const BRAND_DOMAINS = {
-  paypal: "paypal.com",
-  google: "google.com",
-  microsoft: "microsoft.com",
-  apple: "apple.com",
-  amazon: "amazon.com",
-  netflix: "netflix.com",
-  santander: "santander.com",
-  bbva: "bbva.com",
-  caixabank: "caixabank.com",
-  correos: "correos.es",
-  "seguridad social": "seg-social.es",
-  "agencia tributaria": "agenciatributaria.gob.es",
-  dhl: "dhl.com",
-  fedex: "fedex.com",
-  ups: "ups.com",
-  facebook: "facebook.com",
-  instagram: "instagram.com",
-  whatsapp: "whatsapp.com",
-};
+function splitHeadersAndBody(raw) {
+  const parts = raw.split(/\r?\n\r?\n/);
+  return { headerBlock: parts[0], body: parts.slice(1).join("\n\n") };
+}
 
-function parseHeaders(raw) {
-  const headerBlock = raw.split(/\r?\n\r?\n/)[0];
+function parseHeaders(headerBlock) {
   const lines = headerBlock.split(/\r?\n/);
   const unfolded = [];
   for (const line of lines) {
@@ -88,8 +80,16 @@ function authResult(authRaw, mechanism) {
   return m ? m[1].toLowerCase() : null;
 }
 
+function mentionedBrandDomains(text) {
+  const norm = normalize(text);
+  return Object.entries(BRAND_DOMAINS)
+    .filter(([brand]) => norm.includes(normalize(brand)))
+    .flatMap(([, domains]) => domains);
+}
+
 export async function checkMail(rawInput) {
-  const headers = parseHeaders(rawInput);
+  const { headerBlock, body } = splitHeadersAndBody(rawInput);
+  const headers = parseHeaders(headerBlock);
   const flags = [];
 
   const from = headers.get("from")?.[0] || "";
@@ -126,10 +126,35 @@ export async function checkMail(rawInput) {
     flags.push("reply_to_mismatch");
   }
 
-  for (const [brand, domain] of Object.entries(BRAND_DOMAINS)) {
-    if (displayName.includes(brand) && fromDomain && !fromDomain.endsWith(domain)) {
+  for (const [brand, domains] of Object.entries(BRAND_DOMAINS)) {
+    if (displayName.includes(brand) && fromDomain && !domains.some((d) => fromDomain.endsWith(d))) {
       flags.push("display_name_spoof");
       break;
+    }
+  }
+
+  // Análisis del cuerpo: cabeceras limpias no bastan si el cuerpo enlaza a otro sitio
+  // suplantando una entidad conocida (mismo patrón que smsModule.js sobre el texto del SMS).
+  const bodyUrlDetails = [];
+  const bodyUrlHosts = [];
+  if (body.trim()) {
+    if (matchesAny(body, OFFICIAL_NOTICE_WORDS)) flags.push("official_notice_language");
+
+    for (const raw of extractUrls(body)) {
+      const { href, flags: uFlags } = await offlineUrlFlags(raw);
+      bodyUrlDetails.push({ raw, href, flags: uFlags });
+      for (const f of uFlags) if (!flags.includes(f)) flags.push(f);
+      try {
+        bodyUrlHosts.push(new URL(href).hostname.replace(/^www\./, ""));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const expectedDomains = mentionedBrandDomains(displayName + " " + body);
+    if (expectedDomains.length > 0 && bodyUrlHosts.length > 0) {
+      const anyMatch = bodyUrlHosts.some((host) => expectedDomains.some((d) => host === d || host.endsWith(`.${d}`)));
+      if (!anyMatch && !flags.includes("display_name_spoof")) flags.push("brand_domain_mismatch");
     }
   }
 
@@ -142,6 +167,7 @@ export async function checkMail(rawInput) {
     fromDomain,
     returnPathDomain,
     replyToDomain,
+    bodyUrls: bodyUrlDetails,
     flags,
     riskScore,
     verdict,

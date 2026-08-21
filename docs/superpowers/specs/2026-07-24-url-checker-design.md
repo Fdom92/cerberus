@@ -63,6 +63,19 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Repaso de gaps tras el fix de SMS — 6 huecos más cerrados
+Después del fix de Seg. Social se hizo un repaso del resto de módulos buscando el mismo patrón (heurística demasiado estrecha, lista desincronizada, o código muerto). Encontrados y arreglados:
+
+- **Correo no analizaba el cuerpo del mensaje**, solo cabeceras — si SPF/DKIM pasaban (remitente comprometido o servicio de envío legítimo mal usado) pero el cuerpo enlazaba a un sitio de phishing, no se detectaba nada. `mailModule.js` ahora extrae URLs del cuerpo, corre `offlineUrlFlags` sobre ellas, y aplica los mismos `official_notice_language` / `brand_domain_mismatch` que SMS.
+- **`BRAND_DOMAINS` duplicado y desincronizado** entre `mailModule.js` y `smsModule.js` — exactamente la clase de bug que causó el gap original. Extraído a `js/brandDomains.js`, fuente única, valores como array de dominios aceptados (evita falsos positivos tipo "Amazon España vs Amazon EEUU"). `official_notice_language`/`extractUrls`/`normalize` extraídos igual a `js/textHeuristics.js`, compartido por ambos módulos.
+- **`magicBytes.js` sin firma OLE/CFB** (`D0 CF 11 E0`) — .doc/.xls/.ppt antiguos y **.msi** cataban a "unknown" sin detección alguna. De paso, se corrigió un error real: "msi" estaba listado en las extensiones esperadas de la firma **PE** (`4D 5A`), pero un MSI genuino nunca lleva cabecera PE — es un contenedor OLE, formato completamente distinto. Ahora tiene su propia entrada, `executable: true`.
+- **Apps (Android)** le faltaban `BIND_NOTIFICATION_LISTENER_SERVICE` (lee todas las notificaciones) y `QUERY_ALL_PACKAGES` (enumera apps instaladas) — dos indicadores clásicos de stalkerware, ausentes de `DANGEROUS_PERMISSIONS`.
+- **Secretos sin patrones OpenAI/Anthropic** (`sk-...` / `sk-ant-...`) — añadidos con cuidado de que no se solapen (el patrón OpenAI exige 20+ caracteres alfanuméricos consecutivos tras `sk-`, lo que no puede matchear `sk-ant-` por el guión).
+- **JWT: `weak_alg` era código muerto** — comprobaba `["hs1","rs1","none"]`, pero "hs1"/"rs1" no son algoritmos JWT reales (nunca se disparaba). Eliminado en vez de mantenerlo como falsa sensación de cobertura.
+- Menor: lista de acortadores de SMS ampliada (`cutt.ly`, `bit.do`, `tiny.cc`, `shorturl.at`, `s.id`, `rb.gy`, `v.gd`, `tr.im`, `shrtco.de`, `x.co`).
+
+7 tests de regresión nuevos (32 en total), cada uno con el escenario exacto que antes se colaba.
+
 ## Fix: falso negativo real reportado por el usuario (URL/SMS)
 Mensaje real de smishing suplantando a la Seg. Social, tono burocrático ("trámite pendiente") sin urgencia agresiva, enlace a un dominio inventado (`portatsegsvcial.cfd`) sin relación textual con `seg-social.es` ni typo de 1 carácter — daba `safe`, 0/100. Tres heurísticas offline nuevas, todas reutilizables desde URLs y SMS:
 - **`suspicious_tld`** (`urlModule.js`): lista de ~35 TLD desproporcionadamente abusados en phishing (`.cfd`, `.xyz`, `.top`, `.click`, `.tk`, `.gq`... — fuente: informes anuales Interisle/Spamhaus de TLDs más abusados), +30 puntos.

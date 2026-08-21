@@ -58,6 +58,23 @@ test("fileModule: high-entropy executable flagged as packed", async () => {
   assert(r.flags.includes("high_entropy_executable"));
 });
 
+test("fileModule: real .doc (OLE/CFB) is safe", async () => {
+  const bytes = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, ...new Array(20).fill(0)]);
+  const r = await checkFile(new File([bytes], "informe.doc"));
+  assertEqual(r.detected, "OLE/CFB (Office antiguo: doc/xls/ppt, o instalador MSI)");
+  assertEqual(r.verdict, "safe");
+});
+
+test("fileModule: MSI (OLE/CFB) renamed to .pdf is dangerous", async () => {
+  // Regression: MSI installers use the OLE/CFB container (D0 CF 11 E0), not PE — before this
+  // fix magicBytes.js had no OLE signature at all and a renamed malicious .msi fell through
+  // to "unknown" with no flag.
+  const bytes = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, ...new Array(20).fill(0)]);
+  const r = await checkFile(new File([bytes], "factura.pdf"));
+  assert(r.flags.includes("executable_disguised"));
+  assertEqual(r.verdict, "dangerous");
+});
+
 // ---- Mail module ----
 test("mailModule: spoofed brand + failed auth is dangerous", async () => {
   const r = await checkMail(
@@ -73,6 +90,18 @@ test("mailModule: clean aligned headers is safe", async () => {
     "From: Alice <alice@example.com>\nReturn-Path: alice@example.com\nAuthentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\nhi"
   );
   assertEqual(r.verdict, "safe");
+});
+
+test("mailModule: clean headers but body impersonates a brand with mismatched link is dangerous", async () => {
+  // Regression: mailModule used to only look at headers, never the body — a compromised-but-
+  // legitimate-looking sender with a phishing link in the body slipped through entirely.
+  const r = await checkMail(
+    "From: Notificaciones <no-reply@mailer-service.net>\nReturn-Path: no-reply@mailer-service.net\nAuthentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\n" +
+      "Seg Social: tiene un tramite pendiente, consulte su informacion en https://portatsegsvcial.cfd/es"
+  );
+  assert(r.flags.includes("official_notice_language"), "expected official_notice_language flag");
+  assert(r.flags.includes("brand_domain_mismatch"), "expected brand_domain_mismatch flag");
+  assertEqual(r.verdict, "dangerous");
 });
 
 // ---- SMS module ----
@@ -156,6 +185,15 @@ test("secretsModule: clean code has no findings", () => {
   assertEqual(r.verdict, "safe");
 });
 
+test("secretsModule: OpenAI and Anthropic keys detected distinctly", () => {
+  const r = scanSecrets(
+    'const OPENAI_KEY = "sk-abcdefghijklmnopqrstuvwxyz123456";\nconst CLAUDE_KEY = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789";'
+  );
+  assert(r.findings.some((f) => f.name === "OpenAI API key"), "expected OpenAI API key finding");
+  assert(r.findings.some((f) => f.name === "Anthropic API key"), "expected Anthropic API key finding");
+  assertEqual(r.verdict, "dangerous");
+});
+
 // ---- EXIF ----
 test("exifModule: synthetic JPEG round-trips Make/Model/GPS", () => {
   const exif = parseExif(buildTestJpeg());
@@ -231,6 +269,21 @@ test("appsModule: APK with dangerous permission + embedded secret is dangerous",
   assert(r.dangerousPermissions.some((p) => p.name.includes("READ_SMS")));
   assert(r.secretFindings.some((f) => f.name === "GitHub token"));
   assertEqual(r.verdict, "dangerous");
+});
+
+test("appsModule: notification-listener and query-all-packages permissions flagged as dangerous", async () => {
+  // Regression: these two are classic stalkerware/spyware indicators (read every notification,
+  // enumerate every installed app) and were missing from the dangerous-permissions list.
+  const axml = buildTestAxml("com.evil.stalkerware", [
+    "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
+    "android.permission.QUERY_ALL_PACKAGES",
+  ]);
+  const zip = await buildTestZip([{ name: "AndroidManifest.xml", data: axml, method: 0 }]);
+  const r = await checkApp(new File([zip], "stalkerware.apk"));
+  assert(r.dangerousPermissions.some((p) => p.name.includes("BIND_NOTIFICATION_LISTENER_SERVICE")));
+  assert(r.dangerousPermissions.some((p) => p.name.includes("QUERY_ALL_PACKAGES")));
+  assert(r.dangerousPermissions.every((p) => p.severity === "high"));
+  assertEqual(r.verdict, "suspicious"); // 2 high-severity perms = 50 risk, below the 70 "dangerous" cutoff
 });
 
 test("appsModule: non-zip binary falls back to strings-only scan", async () => {
