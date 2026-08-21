@@ -83,6 +83,25 @@ test("smsModule: smishing text with shortened link is dangerous", async () => {
   assertEqual(r.verdict, "dangerous");
 });
 
+test("smsModule: gov-impersonation smishing with abused TLD and brand/domain mismatch is dangerous", async () => {
+  // Regression: a real message a user reported as a false negative — bureaucratic tone
+  // ("tramite pendiente"), no urgency/lure keywords, no IP/at-symbol/typosquat, so it slipped
+  // through until suspicious_tld + brand_domain_mismatch + official_notice_language were added.
+  const r = await checkSms(
+    "Seg Social: Tiene una actualizacion pendiente. Consulte su informacion y gestione el tramite pendiente. https://portatsegsvcial.cfd/es"
+  );
+  assert(r.flags.includes("official_notice_language"), "expected official_notice_language flag");
+  assert(r.flags.includes("brand_domain_mismatch"), "expected brand_domain_mismatch flag");
+  assert(r.flags.includes("suspicious_tld"), "expected suspicious_tld flag");
+  assertEqual(r.verdict, "dangerous");
+});
+
+test("smsModule: brand mention with matching real domain does not false-positive", async () => {
+  const r = await checkSms("Tu paquete de Correos esta en camino, sigue el envio en https://correos.es/seguimiento");
+  assert(!r.flags.includes("brand_domain_mismatch"), "should not flag matching domain as mismatch");
+  assert(!r.flags.includes("suspicious_tld"), "should not flag .es as suspicious");
+});
+
 test("smsModule: benign text is safe", async () => {
   const r = await checkSms("Nos vemos a las 8 en el bar de siempre?");
   assertEqual(r.verdict, "safe");

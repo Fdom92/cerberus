@@ -63,6 +63,15 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Fix: falso negativo real reportado por el usuario (URL/SMS)
+Mensaje real de smishing suplantando a la Seg. Social, tono burocrático ("trámite pendiente") sin urgencia agresiva, enlace a un dominio inventado (`portatsegsvcial.cfd`) sin relación textual con `seg-social.es` ni typo de 1 carácter — daba `safe`, 0/100. Tres heurísticas offline nuevas, todas reutilizables desde URLs y SMS:
+- **`suspicious_tld`** (`urlModule.js`): lista de ~35 TLD desproporcionadamente abusados en phishing (`.cfd`, `.xyz`, `.top`, `.click`, `.tk`, `.gq`... — fuente: informes anuales Interisle/Spamhaus de TLDs más abusados), +30 puntos.
+- **`official_notice_language`** (`smsModule.js`): frases de aviso burocrático vago (“trámite pendiente”, “consulte su información”, “gestione el trámite”) — patrón distinto de la urgencia agresiva ya cubierta, +20 puntos.
+- **`brand_domain_mismatch`** (`smsModule.js`, mismo patrón que el spoof de marca de `mailModule.js` pero sobre el cuerpo del SMS): si el texto menciona una entidad conocida (`BRAND_DOMAINS` — Seg. Social, Correos, DGT, Agencia Tributaria, bancos...) y ningún enlace del mensaje apunta a su dominio real, +40 puntos. Solo se evalúa si hay al menos un enlace en el mensaje.
+- Matching de palabras clave normalizado (`normalize()`: minúsculas + NFD + strip de diacríticos) para no depender de que el texto lleve tildes.
+
+Con las tres, el mensaje reportado pasa de `safe`/0 a `dangerous`/90. Test de regresión permanente en `tests/run.js` con el texto exacto reportado, más un test de falso-positivo (mención de marca con dominio real correcto no dispara nada).
+
 ## Contraseña filtrada — Pwned Passwords (en `passwordModule.js`)
 `checkPwnedPassword(pw)`: SHA-1 de la contraseña calculado en el dispositivo (`crypto.subtle.digest`), solo se envían los 5 primeros caracteres hex del hash a `api.pwnedpasswords.com/range/{prefix}` (k-anonymity — HIBP nunca ve la contraseña ni el hash completo). Botón separado, no automático por cada tecla (evita disparar red en cada pulsación mientras el usuario escribe). Verificado contra la API real: `123456` → 210M+ apariciones; contraseña random → no encontrada. No se guarda en historial, mismo motivo que el resto del módulo Contraseña.
 

@@ -6,6 +6,7 @@ const FLAG_POINTS = {
   ip_literal: 40,
   at_symbol: 30,
   no_https: 30,
+  suspicious_tld: 30,
   excess_subdomains: 15,
   domain_new: 40,
   resolve_failed: 10,
@@ -18,11 +19,21 @@ const FLAG_LABELS = {
   ip_literal: "El host es una IP directa, no un dominio",
   at_symbol: "Contiene '@' — el navegador ignora todo lo anterior, puede ocultar el host real",
   no_https: "No usa HTTPS",
+  suspicious_tld: "Dominio de nivel superior muy usado en campañas de phishing (barato, sin verificación)",
   excess_subdomains: "Demasiados guiones o subdominios — patrón típico de phishing",
   domain_new: "Dominio registrado hace menos de 30 días",
   resolve_failed: "No se pudo resolver el destino final (timeout o bloqueo)",
   domain_age_unknown: "No se pudo determinar la edad del dominio",
 };
+
+// TLDs con abuso desproporcionado en campañas de phishing (baratos, registro sin verificación).
+// Fuentes: informes anuales Interisle/Spamhaus de TLDs más abusados.
+const SUSPICIOUS_TLDS = new Set([
+  "cfd", "xyz", "top", "click", "link", "work", "support", "icu", "cyou", "rest",
+  "quest", "sbs", "gq", "tk", "ml", "ga", "cf", "zip", "mov", "country", "stream",
+  "gdn", "kim", "loan", "men", "party", "review", "science", "trade", "win", "date",
+  "faith", "accountant", "bar", "cam", "buzz", "rocks", "cc",
+]);
 
 let knownDomainsCache = null;
 async function getKnownDomains() {
@@ -68,6 +79,9 @@ function offlineHeuristics(url, knownDomains) {
   const hyphenCount = (host.match(/-/g) || []).length;
   const subdomainCount = host.split(".").length - 2;
   if (hyphenCount > 3 || subdomainCount > 3) flags.push("excess_subdomains");
+
+  const tld = host.split(".").pop();
+  if (SUSPICIOUS_TLDS.has(tld)) flags.push("suspicious_tld");
 
   const bareHost = host.replace(/^www\./, "");
   for (const known of knownDomains) {
