@@ -68,6 +68,83 @@ test("urlModule: '@' en la ruta o la query no es el '@' peligroso", async () => 
   assert(real.flags.includes("at_symbol"), "el userinfo real sí debe marcarse");
 });
 
+// --- Evasiones cerradas (ver tests/evasion-audit.html) ---
+
+test("urlModule: marca como subdominio del atacante se detecta", async () => {
+  // paypal.com.inicio-sesion.net: el dominio real es del atacante y la marca va de subdominio.
+  // Es la forma de dominio de phishing más común y antes pasaba completamente limpia.
+  for (const u of ["https://paypal.com.inicio-sesion.net/login", "https://login.secure.paypal.com.verify.io/"]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(r.flags.includes("brand_subdomain_spoof"), `debería detectarse: ${u}`);
+  }
+});
+
+test("urlModule: nombre de marca dentro de un dominio ajeno se detecta", async () => {
+  for (const u of ["https://paypal-secure-login.com/verify", "https://bbva-clientes-acceso.com/login"]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(r.flags.includes("brand_in_hostname"), `debería detectarse: ${u}`);
+  }
+});
+
+test("urlModule: dominios internacionales legítimos de una marca no son suplantación", async () => {
+  // amazon.de/.fr y los subdominios de un dominio conocido comparten primera etiqueta con la
+  // marca: son legítimos. Este test protege la restauración de typosquat a distancia 2.
+  for (const u of ["https://amazon.de/dp/X", "https://amazon.fr/dp/X", "https://s.correos.es/abc"]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(!r.flags.includes("typosquat"), `no debería marcarse: ${u}`);
+    assert(!r.flags.includes("brand_in_hostname"), `no debería marcarse: ${u}`);
+  }
+});
+
+test("urlModule: typosquat a distancia 2 se vuelve a detectar", async () => {
+  const r = await checkUrl("https://payypall.com/login", { networkEnabled: false });
+  assert(r.flags.includes("typosquat"));
+});
+
+test("smsModule: caracteres invisibles y homoglifos no evaden las palabras clave", async () => {
+  const zwsp = await checkSms("Verifica tu cu​enta en https://acceso-bbva.top/login");
+  assert(zwsp.flags.includes("credential_request"), "el carácter de ancho cero no debe evadir");
+  const cyr = await checkSms("Verifiсa tu cuenta en https://bbva-seguro.top/login");
+  assert(cyr.flags.includes("credential_request"), "el homoglifo cirílico no debe evadir");
+});
+
+test("smsModule: estafa telefónica sin enlace se detecta", async () => {
+  const r = await checkSms("Su cuenta ha sido bloqueada. Llame al 900 123 456 para reactivarla.");
+  assert(r.flags.includes("callback_number"));
+  assertEqual(r.verdict, "suspicious");
+});
+
+test("mailModule: la marca suplantada en el Subject cuenta como identidad", async () => {
+  const r = await checkMail(
+    "From: Servicio <aviso@correo-notificacion.net>\nSubject: Su cuenta de PayPal ha sido suspendida\n" +
+      "Return-Path: aviso@correo-notificacion.net\nAuthentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\n" +
+      "Acceda para restablecerla: https://paypal-restablecer.top/login"
+  );
+  assert(r.flags.includes("display_name_spoof"), "el asunto debe contar para la suplantación");
+  assertEqual(r.verdict, "dangerous");
+});
+
+test("fileModule: doble extensión se detecta aunque el contenido coincida con la extensión final", async () => {
+  // factura.pdf.exe es un .exe de verdad, así que no hay discrepancia de firma: lo que
+  // delata al fichero es el nombre, que aparenta ser un documento.
+  const bytes = new Uint8Array([0x4d, 0x5a, ...new Array(40).fill(0)]);
+  for (const name of ["factura.pdf.exe", "nomina.pdf     .exe"]) {
+    const r = await checkFile(new File([bytes], name));
+    assert(r.flags.includes("double_extension"), `debería detectarse: ${name}`);
+    assertEqual(r.verdict, "dangerous");
+  }
+});
+
+test("secretsModule: una clave real no se descarta por contener 'YOUR'", () => {
+  const r = scanSecrets('aws_key = "AKIAYOURJ7SHDN2P4KQ1"');
+  assert(r.findings.some((f) => f.name === "AWS Access Key ID"));
+});
+
+test("secretsModule: clave escondida en base64 se detecta", () => {
+  const r = scanSecrets('const k = atob("QUtJQUlPU0ZPRE5ON1JFQUxLRVk5OQ==");');
+  assert(r.findings.some((f) => f.name.includes("base64")));
+});
+
 test("urlModule: un TLD abusado por sí solo no basta para sospechar", async () => {
   const r = await checkUrl("https://abc.xyz", { networkEnabled: false }); // dominio de Alphabet
   assert(r.flags.includes("suspicious_tld"), "el TLD se sigue señalando");

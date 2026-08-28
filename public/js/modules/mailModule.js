@@ -84,9 +84,15 @@ function authResult(authRaw, mechanism) {
 }
 
 function mentionedBrandDomains(text) {
+  // Se compara también contra el texto sin espacios para que "Pay Pal Seguridad" o
+  // "Seg. Social" cuenten como mención de la marca: separar la palabra era una evasión trivial.
   const norm = normalize(text);
+  const compact = norm.replace(/[\s.]+/g, "");
   return Object.entries(BRAND_DOMAINS)
-    .filter(([brand]) => norm.includes(normalize(brand)))
+    .filter(([brand]) => {
+      const b = normalize(brand);
+      return norm.includes(b) || compact.includes(b.replace(/\s+/g, ""));
+    })
     .flatMap(([, domains]) => domains);
 }
 
@@ -96,6 +102,7 @@ export async function checkMail(rawInput) {
   const flags = [];
 
   const from = headers.get("from")?.[0] || "";
+  const subject = headers.get("subject")?.[0] || "";
   const returnPath = headers.get("return-path")?.[0] || "";
   const replyTo = headers.get("reply-to")?.[0] || "";
   const authRaw = (headers.get("authentication-results") || []).join(" ");
@@ -129,11 +136,12 @@ export async function checkMail(rawInput) {
     flags.push("reply_to_mismatch");
   }
 
-  for (const [brand, domains] of Object.entries(BRAND_DOMAINS)) {
-    if (displayName.includes(brand) && fromDomain && !domains.some((d) => fromDomain.endsWith(d))) {
-      flags.push("display_name_spoof");
-      break;
-    }
+  // El asunto se ignoraba por completo, y es justo donde se pone la marca suplantada
+  // ("Su cuenta de PayPal ha sido suspendida"). Cuenta igual que el nombre mostrado.
+  const identityText = `${displayName} ${subject}`;
+  const identityBrands = mentionedBrandDomains(identityText);
+  if (identityBrands.length > 0 && fromDomain && !identityBrands.some((d) => fromDomain === d || fromDomain.endsWith(`.${d}`))) {
+    flags.push("display_name_spoof");
   }
 
   // Análisis del cuerpo: cabeceras limpias no bastan si el cuerpo enlaza a otro sitio
@@ -157,11 +165,8 @@ export async function checkMail(rawInput) {
     // Mencionar una marca no es suplantarla: un boletín legítimo dice "síguenos en Facebook"
     // y enlaza a su propio dominio. Solo se marca cuando el mensaje además se PRESENTA como
     // esa entidad — la marca está en el nombre mostrado, o el texto usa tono de aviso oficial.
-    const brandInDisplayName = mentionedBrandDomains(displayName);
-    const impersonating = brandInDisplayName.length > 0 || flags.includes("official_notice_language");
-    const expectedDomains = impersonating
-      ? mentionedBrandDomains(displayName + " " + body)
-      : [];
+    const impersonating = identityBrands.length > 0 || flags.includes("official_notice_language");
+    const expectedDomains = impersonating ? mentionedBrandDomains(`${identityText} ${body}`) : [];
     if (expectedDomains.length > 0 && bodyUrlHosts.length > 0) {
       const anyMatch = bodyUrlHosts.some((host) => expectedDomains.some((d) => host === d || host.endsWith(`.${d}`)));
       if (!anyMatch && !flags.includes("display_name_spoof")) flags.push("brand_domain_mismatch");

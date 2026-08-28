@@ -36,21 +36,69 @@ function redact(value) {
 const PLACEHOLDER_HINTS =
   /(your|example|placeholder|changeme|change_me|dummy|sample|replace_?me|insert_?your|todo|fixme|xxxx|<|>|\.\.\.)/i;
 
-function looksLikePlaceholder(value) {
-  if (PLACEHOLDER_HINTS.test(value)) return true;
-  if (/(.)\1{6,}/.test(value)) return true; // mismo carácter repetido 7+ veces
+// Señal fuerte de valor falso: relleno repetido. No depende de que aparezca una palabra
+// concreta, así que no puede ocultar una clave real por casualidad.
+function isObviouslyFake(value) {
+  return /(.)\1{6,}/.test(value) || /(?:xxxx|XXXX)/.test(value) || /[<>]/.test(value) || value.includes("...");
+}
+
+// `strict` para los patrones con prefijo de proveedor (AKIA…, ghp_…, sk-ant-…): ahí la
+// coincidencia ya es de altísima confianza, y descartarla solo porque el valor contenga
+// "your" o "todo" podía ocultar una clave real que llevara esa subcadena por azar.
+// Para la regla genérica (`password: "..."`), en cambio, los ejemplos de documentación son
+// tan habituales que sí compensa filtrar por palabra.
+function looksLikePlaceholder(value, strict) {
+  if (isObviouslyFake(value)) return true;
+  if (!strict && PLACEHOLDER_HINTS.test(value)) return true;
   return false;
+}
+
+// Una clave metida en base64 no la ve ninguna expresión regular del listado. Se decodifican
+// las tiras de base64 largas y se vuelve a buscar sobre el resultado. Solo se reporta si lo
+// decodificado casa con un patrón de proveedor (los de prefijo, alta confianza): así una
+// cadena base64 cualquiera de un fichero de código no genera ruido.
+function decodedBase64Text(text) {
+  const runs = text.match(/[A-Za-z0-9+/]{20,}={0,2}/g) || [];
+  const out = [];
+  for (const run of runs.slice(0, 200)) {
+    if (run.length % 4 !== 0) continue;
+    try {
+      const decoded = atob(run);
+      if (/^[\x20-\x7e\s]+$/.test(decoded)) out.push(decoded);
+    } catch {
+      /* no era base64 válido */
+    }
+  }
+  return out.join("\n");
 }
 
 export function scanSecrets(text) {
   const findings = [];
+
+  const decoded = decodedBase64Text(text);
+  if (decoded) {
+    for (const { name, re } of PATTERNS) {
+      if (name === "Asignación genérica de secreto" || name === "JWT embebido") continue;
+      re.lastIndex = 0;
+      const m = re.exec(decoded);
+      if (m && !looksLikePlaceholder(m[0], true)) {
+        findings.push({
+          name: `${name} (oculta en base64)`,
+          severity: "high",
+          count: 1,
+          previews: [redact(m[0])],
+        });
+      }
+    }
+  }
+
   for (const { name, severity, re } of PATTERNS) {
     re.lastIndex = 0;
     let match;
     let count = 0;
     const previews = [];
     while ((match = re.exec(text)) && count < 5) {
-      if (looksLikePlaceholder(match[0])) continue;
+      if (looksLikePlaceholder(match[0], name !== "Asignación genérica de secreto")) continue;
       previews.push(redact(match[0]));
       count++;
     }

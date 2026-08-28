@@ -36,6 +36,7 @@ const SHORTENERS = [
 
 const FLAG_POINTS = {
   brand_domain_mismatch: 40,
+  callback_number: 30,
   credential_request: 30,
   lure_language: 20,
   official_notice_language: 20,
@@ -47,6 +48,7 @@ const FLAG_POINTS = {
 
 export const SMS_FLAG_LABELS = {
   brand_domain_mismatch: "Menciona una entidad conocida pero el enlace no apunta a su dominio real — suplantación",
+  callback_number: "Te pide llamar a un número por un problema con tu cuenta. Es la estafa telefónica clásica: nunca llames al número del mensaje, busca el oficial por tu cuenta",
   credential_request: "Pide verificar cuenta, contraseña o código — patrón clásico de phishing",
   lure_language: "Usa gancho de premio, reembolso o paquete retenido para generar clic",
   official_notice_language: "Tono de aviso oficial/burocrático vago ('trámite pendiente') sin detalles verificables",
@@ -57,9 +59,15 @@ export const SMS_FLAG_LABELS = {
 };
 
 function mentionedBrandDomains(text) {
+  // También sin espacios ni puntos: "Seg. Social" y "Pay Pal" tienen que contar como
+  // mención de la marca, o separar la palabra es una evasión de un solo carácter.
   const norm = normalize(text);
+  const compact = norm.replace(/[\s.]+/g, "");
   return Object.entries(BRAND_DOMAINS)
-    .filter(([brand]) => norm.includes(normalize(brand)))
+    .filter(([brand]) => {
+      const b = normalize(brand);
+      return norm.includes(b) || compact.includes(b.replace(/\s+/g, ""));
+    })
     .flatMap(([, domains]) => domains);
 }
 
@@ -72,6 +80,14 @@ export async function checkSms(rawText) {
   if (matchesAny(rawText, URGENCY_WORDS)) flags.push("urgency_language");
   if (matchesAny(rawText, OFFICIAL_NOTICE_WORDS)) flags.push("official_notice_language");
   if (urls.length > 1) flags.push("multiple_urls");
+
+  // Vishing: sin enlace no había casi nada que analizar, pero "su cuenta está bloqueada,
+  // llame a este número" es una estafa muy extendida y no dejaba ninguna señal.
+  const hasPhone = /(?:\+34[\s-]?)?(?:\d[\s-]?){9,}/.test(rawText);
+  const problemContext = matchesAny(rawText, [
+    "cuenta", "tarjeta", "bloque", "suspend", "seguridad", "fraude", "cargo", "account", "card",
+  ]);
+  if (hasPhone && problemContext && urls.length === 0) flags.push("callback_number");
 
   const urlDetails = [];
   const urlHosts = [];

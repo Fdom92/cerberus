@@ -1,6 +1,21 @@
+// Cirílicos/griegos que se ven igual que una letra latina. Un atacante sustituye una sola
+// letra ("Verifiса tu cuenta" con 'с' cirílica) y la palabra deja de coincidir con la lista.
+const LOOKALIKES = {
+  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", і: "i", ј: "j", ѕ: "s",
+  ԁ: "d", һ: "h", ӏ: "l", в: "b", к: "k", м: "m", н: "h", т: "t", ν: "v", ο: "o",
+  α: "a", ρ: "p", τ: "t", υ: "u", χ: "x", ι: "i", κ: "k",
+};
+
 // Utilidades de texto compartidas por smsModule.js y mailModule.js (análisis del cuerpo).
 export function normalize(s) {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return s
+    .toLowerCase()
+    // Caracteres de ancho cero: invisibles, pero rompían la coincidencia de palabras
+    // ("cu​enta" no casaba con "cuenta") sin que se notara nada raro en pantalla.
+    .replace(/[\u200b-\u200f\u2060-\u2064\ufeff\u00ad]/g, "")
+    .replace(/[\u0400-\u04ff\u0370-\u03ff]/g, (ch) => LOOKALIKES[ch] || ch)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 }
 
 export function matchesAny(text, words) {

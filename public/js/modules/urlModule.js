@@ -1,9 +1,12 @@
 import { saveResult } from "../db.js";
 import { analyzeHostnameScripts } from "../punycode.js";
+import { BRAND_DOMAINS } from "../brandDomains.js";
 
 const FLAG_POINTS = {
   homograph: 50,
   typosquat: 50,
+  brand_subdomain_spoof: 50,
+  brand_in_hostname: 35,
   ip_literal: 40,
   at_symbol: 30,
   no_https: 30,
@@ -19,6 +22,8 @@ const FLAG_POINTS = {
 const FLAG_LABELS = {
   homograph: "El dominio usa caracteres que imitan letras latinas — posible homógrafo",
   typosquat: "Muy parecido a un dominio conocido — posible typosquatting",
+  brand_subdomain_spoof: "El dominio real no es el de la marca: la marca aparece solo como subdominio, y lo que manda es lo que va justo antes del .com/.es final",
+  brand_in_hostname: "Usa el nombre de una entidad conocida dentro de un dominio que no le pertenece",
   ip_literal: "El host es una IP directa, no un dominio",
   at_symbol: "Contiene '@' — el navegador ignora todo lo anterior, puede ocultar el host real",
   no_https: "No usa HTTPS",
@@ -64,6 +69,59 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+// Sufijos de segundo nivel frecuentes: sin esto, el dominio registrable de "dgt.gob.es"
+// se calcularía como "gob.es" y la comprobación de marca fallaría.
+const SECOND_LEVEL = new Set(["co", "com", "gob", "org", "net", "edu", "gov", "ac", "gov"]);
+
+function registrableDomain(host) {
+  const parts = host.split(".");
+  if (parts.length <= 2) return host;
+  const last = parts[parts.length - 1];
+  const prev = parts[parts.length - 2];
+  const take = last.length === 2 && SECOND_LEVEL.has(prev) ? 3 : 2;
+  return parts.slice(-take).join(".");
+}
+
+// Variantes del nombre de marca tal y como aparecerían en un dominio:
+// "seg social" -> "segsocial" y "seg-social".
+function brandTokens(brand) {
+  return new Set([brand.replace(/\s+/g, ""), brand.replace(/\s+/g, "-")]);
+}
+
+// Las dos formas de phishing de dominio más habituales, y las que peor detectaba antes:
+//   paypal.com.inicio-sesion.net  -> la marca va de subdominio; el dominio real es el del atacante
+//   bbva-clientes-acceso.com      -> el nombre de la marca metido en un dominio ajeno
+// La clave para no dar falsos positivos es comparar contra el dominio REGISTRABLE: así
+// amazon.de o google.es (internacionales legítimos) no saltan, porque su primera etiqueta
+// sigue siendo el nombre de la marca.
+function brandImpersonationFlags(host) {
+  const flags = [];
+  const registrable = registrableDomain(host);
+  const registrableFirstLabel = registrable.split(".")[0];
+
+  for (const [brand, domains] of Object.entries(BRAND_DOMAINS)) {
+    const legit = domains.some((d) => registrable === d || host === d || host.endsWith(`.${d}`));
+    if (legit) return []; // es realmente un dominio de la marca
+
+    // A) el dominio de la marca aparece dentro del host pero no es el dominio real
+    if (domains.some((d) => host.includes(`${d}.`) || host.includes(`.${d}`))) {
+      flags.push("brand_subdomain_spoof");
+      break;
+    }
+
+    // B) el nombre de la marca aparece como token del host, pero el dominio no es suyo.
+    // Se exige token exacto (separado por . o -) para no marcar "amazonas.com" por "amazon".
+    const tokens = brandTokens(brand);
+    const hostTokens = host.split(/[.-]/);
+    const brandTokenPresent = [...tokens].some((t) => hostTokens.includes(t) || host.split(".").includes(t));
+    if (brandTokenPresent && !tokens.has(registrableFirstLabel)) {
+      flags.push("brand_in_hostname");
+      break;
+    }
+  }
+  return flags;
+}
+
 function parseUrl(raw) {
   let input = raw.trim();
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) input = "https://" + input;
@@ -101,13 +159,30 @@ function offlineHeuristics(url, knownDomains) {
   const tld = host.split(".").pop();
   if (SUSPICIOUS_TLDS.has(tld)) flags.push("suspicious_tld");
 
+  flags.push(...brandImpersonationFlags(host));
+
+  // El umbral se bajó a 1 porque a distancia 2 chocaban marcas legítimas entre sí
+  // (github.com/gitlab.com, x.com/t.co). La causa real era comparar dos dominios que
+  // ESTÁN AMBOS en la lista: si el host ya es un dominio conocido, no hay nada que sospechar.
+  // Con esa guarda se puede volver a 2 y así se cazan cosas como "payypall.com".
   const bareHost = host.replace(/^www\./, "");
-  for (const known of knownDomains) {
-    if (bareHost === known) continue;
-    const dist = levenshtein(bareHost, known);
-    if (dist > 0 && dist <= 1) {
-      flags.push("typosquat");
-      break;
+  const hostFirstLabel = bareHost.split(".")[0];
+  // Un subdominio de un dominio conocido (s.correos.es) es el propio dominio conocido.
+  const isKnownGood = knownDomains.some((d) => bareHost === d || bareHost.endsWith(`.${d}`));
+  if (!isKnownGood) {
+    for (const known of knownDomains) {
+      // Misma marca en otro país (amazon.de frente a amazon.es) comparte la primera etiqueta
+      // y solo cambia el TLD: son 2 ediciones, pero es el dominio legítimo, no un typosquat.
+      // Suplantar la marca en OTRO dominio (amazon.evil.com) lo cazan las reglas de marca.
+      if (known.split(".")[0] === hostFirstLabel) continue;
+      const dist = levenshtein(bareHost, known);
+      // Solo se admite distancia 2 en dominios largos: en los cortos, 2 ediciones son
+      // media palabra y cualquier dominio no relacionado acabaría pareciéndose.
+      const limit = known.length >= 9 ? 2 : 1;
+      if (dist > 0 && dist <= limit) {
+        flags.push("typosquat");
+        break;
+      }
     }
   }
   return flags;

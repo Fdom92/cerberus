@@ -63,6 +63,50 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Auditoría de evasiones (red team) — de 18 coladas a 3
+Las auditorías anteriores comprobaban que no diera falsos positivos y que no fuera vulnerable.
+Faltaba la contraria: **atacarla a propósito**. `tests/evasion-audit.html` lanza 27 ataques reales
+construidos para esquivar cada heurística. En la primera pasada **18 de 27 salían `safe`** — la
+herramienta era mucho más débil ante un atacante que se esforzara que ante phishing ingenuo.
+
+Lo más grave, y lo que más se ve en la vida real:
+
+- **`paypal.com.inicio-sesion.net`** — la marca de subdominio y el dominio real del atacante. Es
+  *la* forma de dominio de phishing más común y pasaba completamente limpia.
+- **`bbva-clientes-acceso.com`** — el nombre de la marca metido en un dominio ajeno. Igual de común,
+  igual de invisible.
+
+Ambas se cierran comparando contra el **dominio registrable** (última etiqueta significativa, con
+los sufijos tipo `.gob.es` contemplados), que es justo lo que evita el falso positivo: `amazon.de`
+y `sede.dgt.gob.es` conservan la marca en su primera etiqueta y no saltan, mientras que
+`amazon-pedidos.net` sí.
+
+Resto de evasiones cerradas:
+- **Doble extensión** (`factura.pdf.exe`): el disfraz más antiguo que existe. No había discrepancia
+  de firma que detectar —el fichero *es* un .exe— así que lo que se analiza es el **nombre**.
+- **El `Subject` no se leía**, y es justo donde se pone la marca suplantada.
+- **Caracteres de ancho cero y homoglifos cirílicos** dentro de las palabras clave: `cu​enta`
+  y `Verifiсa` (с cirílica) rompían la coincidencia sin verse en pantalla. `normalize()` los limpia.
+- **Marca escrita separada** ("Pay Pal", "Seg. Social"): se compara también sin espacios ni puntos.
+- **Estafa telefónica sin enlace** ("llame al 900…"): no dejaba ninguna señal, y es cada vez más común.
+- **Typosquat a distancia 2** (`payypall.com`): restaurado. Los falsos positivos que obligaron a
+  bajarlo a 1 venían de comparar marcas legítimas entre sí; con dos guardas (host que ya es o es
+  subdominio de un dominio conocido, y misma primera etiqueta en otro TLD) el umbral 2 es seguro.
+- **Secretos**: el filtro de placeholders ocultaba una clave real que contuviera "your", así que
+  para los patrones con prefijo de proveedor (alta confianza) ahora solo se descarta ante relleno
+  evidente. Y se decodifican las tiras base64 para encontrar claves escondidas ahí.
+
+**Lo que sigue colándose, y por qué se acepta:**
+- *Marca en la ruta* (`otro-dominio.com/paypal.com/login`): lo que manda es el dominio, y los sitios
+  legítimos llevan nombres de marca en las rutas continuamente. Marcarlo daría falsos positivos.
+- *Urgencia implícita sin palabras clave* ("su expediente requiere acción antes del viernes"):
+  límite de fondo de cualquier detección por palabras — el atacante solo tiene que reformular.
+- *Clave partida en el código* (`"AKIA" + "IOSF..."`): haría falta evaluar el código, fuera del
+  alcance de un escáner de expresiones regulares.
+
+Tras estos cambios el corpus de entradas legítimas **sigue en 0 falsos positivos**, que era la
+condición: endurecer la detección sin volver a molestar con cosas normales.
+
 ## Auditoría de publicación (entradas hostiles y veracidad de las afirmaciones)
 Antes de publicar, una segunda auditoría sobre lo que no cubría la de falsos positivos: que la
 propia app no sea vulnerable y que no afirme cosas que no cumple. `tests/hostile-audit.html`
