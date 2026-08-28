@@ -73,6 +73,7 @@ export const WEBRTC_FLAG_LABELS = {
   mdns_protected: "Buena señal: tu navegador oculta la IP local real (usa un alias mDNS aleatorio)",
   public_ip_leak: "Fuga detectada: el STUN ve una IP pública distinta a la de tu conexión HTTPS normal — posible fuga de VPN",
   no_candidates: "No se obtuvo ningún candidato ICE (STUN bloqueado o red muy restrictiva) — buena señal de privacidad, pero no se pudo diagnosticar una fuga",
+  family_mismatch: "El STUN y la petición HTTPS salieron por familias de IP distintas (IPv6 vs IPv4). Es normal en conexiones dual-stack, pero impide comparar: no se puede confirmar ni descartar una fuga",
   ip_echo_failed: "No se pudo contactar el servicio de IP pública para comparar",
 };
 
@@ -88,10 +89,19 @@ export async function checkWebRtcLeak() {
   if (!publicIpViaHttps) flags.push("ip_echo_failed");
   if (localIps.length === 0 && stunIps.length === 0) flags.push("no_candidates");
 
+  // Solo tiene sentido comparar direcciones de la misma familia: en una conexión dual-stack
+  // es normalísimo que el STUN vea tu IPv6 y la petición HTTPS salga por IPv4. Compararlas
+  // entre sí daba "fuga detectada" en conexiones domésticas perfectamente normales.
+  const isV6 = (ip) => ip.includes(":");
   let leakDetected = null;
   if (publicIpViaHttps && stunIps.length > 0) {
-    leakDetected = !stunIps.includes(publicIpViaHttps);
-    if (leakDetected) flags.push("public_ip_leak");
+    const sameFamily = stunIps.filter((ip) => isV6(ip) === isV6(publicIpViaHttps));
+    if (sameFamily.length > 0) {
+      leakDetected = !sameFamily.includes(publicIpViaHttps);
+      if (leakDetected) flags.push("public_ip_leak");
+    } else {
+      flags.push("family_mismatch");
+    }
   }
 
   const verdict = leakDetected === true ? "dangerous" : leakDetected === false ? "safe" : "unknown";

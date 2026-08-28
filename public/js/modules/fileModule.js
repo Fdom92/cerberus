@@ -25,9 +25,12 @@ export async function checkFile(file) {
 
   const entropySample = await readEntropySample(file);
   const entropy = shannonEntropy(entropySample);
+  // La entropía alta por sí sola NO es peligrosa: prácticamente todo instalador legítimo
+  // (NSIS, Inno Setup, Electron…) va comprimido y supera el umbral. Antes esto marcaba
+  // "dangerous" cualquier instalador descargado. Se informa, pero no cambia el veredicto:
+  // solo agrava cuando el archivo ADEMÁS venía disfrazado con otra extensión.
   if (sig?.executable && entropy > HIGH_ENTROPY_THRESHOLD) {
-    flags.push("high_entropy_executable");
-    verdict = "dangerous";
+    flags.push("packed_executable");
   }
 
   const hash = file.size <= HASH_SIZE_LIMIT ? await sha256Hex(file) : null;
@@ -63,5 +66,5 @@ export const FILE_FLAG_LABELS = {
   unknown_signature: "No se reconoce la firma del archivo (formato no catalogado o corrupto)",
   extension_mismatch: "La extensión no coincide con el contenido real del archivo",
   executable_disguised: "Es un ejecutable disfrazado con otra extensión — alto riesgo",
-  high_entropy_executable: "Ejecutable con entropía muy alta — indicio de empaquetado/cifrado (técnica común para evadir detección)",
+  packed_executable: "Ejecutable comprimido o empaquetado. Es lo normal en instaladores, pero también se usa para evadir antivirus — dato informativo, no una alerta por sí solo",
 };

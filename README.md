@@ -68,6 +68,8 @@ python3 -m http.server 8080
 
 Open `http://localhost:8080/tests/index.html`. Pass/fail renders on the page and logs to the console.
 
+There's a second suite at `tests/fp-audit.html` that runs the opposite check: a corpus of **legitimate** real-world inputs (2FA codes, accented domains, newsletters sent through Mailchimp, compressed installers, documentation placeholders) that must **not** be flagged. A security tool that cries wolf at ordinary things teaches people to ignore it, which is worse than having no tool — so this suite is treated as seriously as the detection tests. It prints a table of anything that trips, rather than pass/fail.
+
 ## Deploying
 
 Any static host works. For GitHub Pages: **Settings → Pages → Source: Deploy from a branch → `main` / `/public`**. That's it — `manifest.webmanifest` and `sw.js` make it installable (Add to Home Screen) and usable offline from there.

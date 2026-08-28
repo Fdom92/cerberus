@@ -24,8 +24,13 @@ const SIGNATURES = [
   { name: "7-Zip", mime: "application/x-7z-compressed", ext: ["7z"], executable: false, match: (v) => bytesAt(v, 0, "37 7A BC AF 27 1C") },
   { name: "RAR", mime: "application/x-rar-compressed", ext: ["rar"], executable: false, match: (v) => bytesAt(v, 0, "52 61 72 21 1A 07") },
   { name: "MP3", mime: "audio/mpeg", ext: ["mp3"], executable: false, match: (v) => bytesAt(v, 0, "49 44 33") || bytesAt(v, 0, "FF FB") },
+  // HEIC y AVIF comparten la caja "ftyp" con MP4, así que van antes: si no, MP4 los captura primero.
+  { name: "HEIC / HEIF (foto de iPhone)", mime: "image/heic", ext: ["heic", "heif"], executable: false, match: (v) => bytesAt(v, 4, "66 74 79 70") && (bytesAt(v, 8, "68 65 69 63") || bytesAt(v, 8, "68 65 69 78") || bytesAt(v, 8, "6D 69 66 31")) },
+  { name: "AVIF", mime: "image/avif", ext: ["avif"], executable: false, match: (v) => bytesAt(v, 4, "66 74 79 70") && bytesAt(v, 8, "61 76 69 66") },
   { name: "MP4 / MOV", mime: "video/mp4", ext: ["mp4", "mov", "m4v"], executable: false, match: (v) => bytesAt(v, 4, "66 74 79 70") },
   { name: "WAV", mime: "audio/wav", ext: ["wav"], executable: false, match: (v) => bytesAt(v, 0, "52 49 46 46") && bytesAt(v, 8, "57 41 56 45") },
+  { name: "WebP", mime: "image/webp", ext: ["webp"], executable: false, match: (v) => bytesAt(v, 0, "52 49 46 46") && bytesAt(v, 8, "57 45 42 50") },
+  { name: "SQLite", mime: "application/vnd.sqlite3", ext: ["db", "sqlite", "sqlite3"], executable: false, match: (v) => bytesAt(v, 0, "53 51 4C 69 74 65 20 66 6F 72 6D 61 74 20 33 00") },
   { name: "Script (shebang)", mime: "text/x-shellscript", ext: ["sh", "bash", "py", "pl", "rb"], executable: true, match: (v) => bytesAt(v, 0, "23 21") },
 ];
 

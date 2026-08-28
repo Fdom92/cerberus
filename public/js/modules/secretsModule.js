@@ -6,11 +6,12 @@ const PATTERNS = [
   { name: "Slack token", severity: "high", re: /xox[baprs]-[A-Za-z0-9-]{10,48}/g },
   { name: "Slack webhook", severity: "high", re: /https:\/\/hooks\.slack\.com\/services\/T[A-Za-z0-9_]+\/B[A-Za-z0-9_]+\/[A-Za-z0-9_]+/g },
   { name: "Stripe live secret key", severity: "high", re: /[sr]k_live_[0-9a-zA-Z]{24,}/g },
-  { name: "Stripe publishable key", severity: "medium", re: /pk_live_[0-9a-zA-Z]{24,}/g },
+  // La clave "publishable" de Stripe (pk_live_) NO se incluye: está diseñada para ir en el
+  // JavaScript público de la página de pago. Marcarla como secreto filtrado era un falso positivo.
   { name: "Google/Firebase API key", severity: "high", re: /AIza[0-9A-Za-z\-_]{35}/g },
-  { name: "Twilio API key", severity: "high", re: /SK[0-9a-fA-F]{32}/g },
+  { name: "Twilio API key", severity: "high", re: /\bSK[0-9a-fA-F]{32}\b/g },
   { name: "SendGrid API key", severity: "high", re: /SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}/g },
-  { name: "Mailgun API key", severity: "high", re: /key-[0-9a-zA-Z]{32}/g },
+  { name: "Mailgun API key", severity: "high", re: /\bkey-[0-9a-zA-Z]{32}\b/g },
   { name: "npm token", severity: "high", re: /npm_[A-Za-z0-9]{36}/g },
   { name: "Anthropic API key", severity: "high", re: /sk-ant-(?:api\d{2}-)?[A-Za-z0-9_-]{20,}/g },
   { name: "OpenAI API key", severity: "high", re: /sk-[A-Za-z0-9]{20,}/g },
@@ -25,6 +26,22 @@ function redact(value) {
   return value.slice(0, 4) + "…" + value.slice(-4);
 }
 
+// Documentación y ficheros de ejemplo están llenos de claves con la forma correcta pero valor
+// falso ("sk-XXXXXXXX", api_key: "YOUR_API_KEY_HERE"). Avisar de esas es ruido que enseña
+// a ignorar la herramienta. Se asume que una clave real no es una repetición ni lleva
+// literalmente "your"/"example"/"changeme" dentro.
+// Deliberadamente conservador: mejor mostrar de vez en cuando un placeholder que ocultar una
+// clave real. Por eso NO se filtra por subcadenas que aparecen de forma natural dentro de claves
+// legítimas ("abcdef" es hex perfectamente normal, "foo"/"bar" caben en cualquier base64).
+const PLACEHOLDER_HINTS =
+  /(your|example|placeholder|changeme|change_me|dummy|sample|replace_?me|insert_?your|todo|fixme|xxxx|<|>|\.\.\.)/i;
+
+function looksLikePlaceholder(value) {
+  if (PLACEHOLDER_HINTS.test(value)) return true;
+  if (/(.)\1{6,}/.test(value)) return true; // mismo carácter repetido 7+ veces
+  return false;
+}
+
 export function scanSecrets(text) {
   const findings = [];
   for (const { name, severity, re } of PATTERNS) {
@@ -33,6 +50,7 @@ export function scanSecrets(text) {
     let count = 0;
     const previews = [];
     while ((match = re.exec(text)) && count < 5) {
+      if (looksLikePlaceholder(match[0])) continue;
       previews.push(redact(match[0]));
       count++;
     }

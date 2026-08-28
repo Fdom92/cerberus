@@ -10,10 +10,17 @@ const URGENCY_WORDS = [
   "tiempo limitado",
 ];
 
+// Solo frases que PIDEN una credencial. Antes incluía "codigo de verificacion", "contraseña" y
+// "password" a secas, y eso marcaba como sospechoso el SMS legítimo más común que existe:
+// "Tu código de verificación es 847362" o "Tu contraseña se ha cambiado correctamente".
+// Entregar un código es normal; pedir que lo introduzcas en algún sitio es lo que delata phishing.
 const CREDENTIAL_WORDS = [
-  "verifica tu cuenta", "verify your account", "actualiza tus datos", "update your details",
-  "confirma tu identidad", "confirm your identity", "codigo de verificacion", "verification code",
-  "contraseña", "password", "pin de seguridad", "security pin", "introduce tu", "enter your",
+  "verifica tu cuenta", "verify your account", "valida tu cuenta", "validate your account",
+  "actualiza tus datos", "update your details", "confirma tus datos", "confirm your details",
+  "confirma tu identidad", "confirm your identity", "verifica tu identidad",
+  "introduce tu", "introduzca su", "enter your", "facilita tus datos", "facilitenos sus datos",
+  "reactiva tu cuenta", "reactivate your account", "identificate en", "inicia sesion en el siguiente",
+  "necesitamos tu contraseña", "we need your password", "confirma tu contraseña",
 ];
 
 const LURE_WORDS = [

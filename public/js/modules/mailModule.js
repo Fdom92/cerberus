@@ -9,8 +9,11 @@ const FLAG_POINTS = {
   spf_fail: 30,
   dkim_fail: 30,
   dmarc_fail: 30,
-  reply_to_mismatch: 25,
-  from_returnpath_mismatch: 20,
+  // Ojo: un Return-Path o un Reply-To distintos del From son el comportamiento NORMAL de
+  // cualquier envío masivo legítimo (Mailchimp, SendGrid) y de cualquier lista de correo.
+  // Son señal muy débil por sí solos — suman, pero no bastan para sospechar.
+  reply_to_mismatch: 10,
+  from_returnpath_mismatch: 8,
   official_notice_language: 20,
   spf_missing: 15,
   dkim_missing: 15,
@@ -151,7 +154,14 @@ export async function checkMail(rawInput) {
       }
     }
 
-    const expectedDomains = mentionedBrandDomains(displayName + " " + body);
+    // Mencionar una marca no es suplantarla: un boletín legítimo dice "síguenos en Facebook"
+    // y enlaza a su propio dominio. Solo se marca cuando el mensaje además se PRESENTA como
+    // esa entidad — la marca está en el nombre mostrado, o el texto usa tono de aviso oficial.
+    const brandInDisplayName = mentionedBrandDomains(displayName);
+    const impersonating = brandInDisplayName.length > 0 || flags.includes("official_notice_language");
+    const expectedDomains = impersonating
+      ? mentionedBrandDomains(displayName + " " + body)
+      : [];
     if (expectedDomains.length > 0 && bodyUrlHosts.length > 0) {
       const anyMatch = bodyUrlHosts.some((host) => expectedDomains.some((d) => host === d || host.endsWith(`.${d}`)));
       if (!anyMatch && !flags.includes("display_name_spoof")) flags.push("brand_domain_mismatch");

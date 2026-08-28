@@ -1,11 +1,18 @@
-function isMostlyPrintable(str) {
-  if (!str) return false;
-  let printable = 0;
+// Antes bastaba con que los bytes fueran "imprimibles", y eso incluía el rango alto de Latin-1,
+// así que palabras normales como "test" o "deadbeef" se "decodificaban" a garabatos y se
+// mostraban como si fueran un hallazgo. Ahora se exige que el resultado parezca texto de verdad.
+function looksLikeText(str) {
+  if (!str || str.length < 2) return false;
+  if (str.includes("�")) return false; // carácter de reemplazo: no era UTF-8 válido
+  let plausible = 0;
   for (const ch of str) {
     const code = ch.codePointAt(0);
-    if ((code >= 32 && code <= 126) || code >= 160) printable++;
+    const isAsciiText = code >= 32 && code <= 126;
+    const isCommonWhitespace = ch === "\n" || ch === "\r" || ch === "\t";
+    const isAccentedLatin = (code >= 0xc0 && code <= 0x24f) || (code >= 0x2018 && code <= 0x201d);
+    if (isAsciiText || isCommonWhitespace || isAccentedLatin) plausible++;
   }
-  return printable / str.length > 0.85;
+  return plausible / str.length > 0.95;
 }
 
 function tryUrlDecode(input) {
@@ -60,7 +67,7 @@ export function decodeAll(input) {
   ];
   for (const [label, fn] of attempts) {
     const out = fn(input);
-    if (out && out !== input && isMostlyPrintable(out)) {
+    if (out && out !== input && looksLikeText(out)) {
       results.push({ label, value: out });
     }
   }

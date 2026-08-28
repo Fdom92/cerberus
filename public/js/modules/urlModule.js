@@ -1,4 +1,5 @@
 import { saveResult } from "../db.js";
+import { analyzeHostnameScripts } from "../punycode.js";
 
 const FLAG_POINTS = {
   homograph: 50,
@@ -6,7 +7,9 @@ const FLAG_POINTS = {
   ip_literal: 40,
   at_symbol: 30,
   no_https: 30,
-  suspicious_tld: 30,
+  // Un TLD abusado por sí solo NO basta para sospechar: hay muchísimos sitios legítimos en
+  // .xyz/.top/.link (abc.xyz es de Alphabet). Suma, pero no alcanza el umbral en solitario.
+  suspicious_tld: 15,
   excess_subdomains: 15,
   domain_new: 40,
   resolve_failed: 10,
@@ -14,7 +17,7 @@ const FLAG_POINTS = {
 };
 
 const FLAG_LABELS = {
-  homograph: "Dominio en punycode / posible homógrafo (caracteres que imitan letras latinas)",
+  homograph: "El dominio usa caracteres que imitan letras latinas — posible homógrafo",
   typosquat: "Muy parecido a un dominio conocido — posible typosquatting",
   ip_literal: "El host es una IP directa, no un dominio",
   at_symbol: "Contiene '@' — el navegador ignora todo lo anterior, puede ocultar el host real",
@@ -73,8 +76,10 @@ function offlineHeuristics(url, knownDomains) {
 
   if (url.protocol !== "https:") flags.push("no_https");
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) flags.push("ip_literal");
-  if (url.href.includes("@") && /@/.test(url.href.split("//")[1] || "")) flags.push("at_symbol");
-  if (host.includes("xn--") || /[^\x00-\x7F]/.test(host)) flags.push("homograph");
+  // Solo cuenta el '@' de userinfo (https://usuario@host), que es el que oculta el host real.
+  // Un '@' en la ruta o la query es normalísimo: emails de contacto, paquetes npm (@1.0.0)…
+  if (url.username || url.password) flags.push("at_symbol");
+  if (analyzeHostnameScripts(host).suspicious) flags.push("homograph");
 
   const hyphenCount = (host.match(/-/g) || []).length;
   const subdomainCount = host.split(".").length - 2;

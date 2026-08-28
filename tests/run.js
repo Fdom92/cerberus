@@ -35,6 +35,45 @@ test("urlModule: offlineUrlFlags helper works standalone", async () => {
   assert(flags.includes("ip_literal"), "expected ip_literal flag");
 });
 
+// --- Falsos positivos corregidos (ver docs/superpowers/specs) ---
+
+test("urlModule: dominios con tilde/diéresis legítimos no son homógrafos", async () => {
+  // URL.hostname devuelve punycode, así que la comprobación antigua (/[^\x00-\x7F]/ o "xn--")
+  // marcaba como ataque cualquier dominio internacionalizado legítimo — mañana.es incluido.
+  for (const u of ["https://mañana.es", "https://münchen.de", "https://café.fr"]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(!r.flags.includes("homograph"), `${u} no debería marcarse como homógrafo`);
+    assertEqual(r.verdict, "safe");
+  }
+});
+
+test("urlModule: homógrafo real (mezcla de alfabetos y sosias latino) sí se detecta", async () => {
+  const mixto = await checkUrl("https://xn--pple-43d.com", { networkEnabled: false }); // аpple.com
+  assert(mixto.flags.includes("homograph"), "mezcla latino+cirílico debería marcarse");
+  const puro = await checkUrl("https://xn--80ak6aa92e.com", { networkEnabled: false }); // аррӏе.com
+  assert(puro.flags.includes("homograph"), "cirílico que imita 'apple' debería marcarse");
+});
+
+test("urlModule: '@' en la ruta o la query no es el '@' peligroso", async () => {
+  // Solo el userinfo (https://usuario@host) oculta el host real. Un email de contacto en la
+  // query o un paquete npm con @version son completamente normales.
+  for (const u of [
+    "https://example.com/contacto?email=juan@example.com",
+    "https://cdn.jsdelivr.net/npm/paquete@1.0.0/dist/index.js",
+  ]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(!r.flags.includes("at_symbol"), `${u} no debería marcar at_symbol`);
+  }
+  const real = await checkUrl("https://google.com@evil.example/login", { networkEnabled: false });
+  assert(real.flags.includes("at_symbol"), "el userinfo real sí debe marcarse");
+});
+
+test("urlModule: un TLD abusado por sí solo no basta para sospechar", async () => {
+  const r = await checkUrl("https://abc.xyz", { networkEnabled: false }); // dominio de Alphabet
+  assert(r.flags.includes("suspicious_tld"), "el TLD se sigue señalando");
+  assertEqual(r.verdict, "safe"); // pero no alcanza el umbral en solitario
+});
+
 // ---- File module ----
 test("fileModule: real PDF is safe", async () => {
   const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, ...new Array(20).fill(0x41)]);
@@ -50,12 +89,15 @@ test("fileModule: PE renamed to .pdf is dangerous (executable_disguised)", async
   assertEqual(r.verdict, "dangerous");
 });
 
-test("fileModule: high-entropy executable flagged as packed", async () => {
+test("fileModule: high-entropy executable reported as packed but NOT dangerous on its own", async () => {
+  // Casi todo instalador legítimo va comprimido: la entropía alta se informa, pero marcar
+  // "dangerous" por eso sola convertía cualquier instalador descargado en un falso positivo.
   const random = new Uint8Array(2000);
   crypto.getRandomValues(random);
   const bytes = new Uint8Array([0x4d, 0x5a, ...random]);
   const r = await checkFile(new File([bytes], "packed.exe"));
-  assert(r.flags.includes("high_entropy_executable"));
+  assert(r.flags.includes("packed_executable"));
+  assertEqual(r.verdict, "safe");
 });
 
 test("fileModule: real .doc (OLE/CFB) is safe", async () => {
@@ -89,6 +131,20 @@ test("mailModule: clean aligned headers is safe", async () => {
   const r = await checkMail(
     "From: Alice <alice@example.com>\nReturn-Path: alice@example.com\nAuthentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\nhi"
   );
+  assertEqual(r.verdict, "safe");
+});
+
+test("mailModule: boletín legítimo enviado por un ESP no se marca", async () => {
+  // Return-Path del proveedor de envío y Reply-To distinto son el comportamiento NORMAL de
+  // Mailchimp/SendGrid y de cualquier lista de correo; mencionar "Facebook" no es suplantarlo.
+  const r = await checkMail(
+    "From: Boletin Empresa <news@miempresa.com>\n" +
+      "Return-Path: bounce-123@mail139.mailchimp.com\n" +
+      "Reply-To: soporte@miempresa.com\n" +
+      "Authentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\n" +
+      "Hola! Siguenos en Facebook e Instagram. Ver online: https://miempresa.com/boletin"
+  );
+  assert(!r.flags.includes("brand_domain_mismatch"), "mencionar una marca no es suplantarla");
   assertEqual(r.verdict, "safe");
 });
 
@@ -133,6 +189,31 @@ test("smsModule: brand mention with matching real domain does not false-positive
 
 test("smsModule: benign text is safe", async () => {
   const r = await checkSms("Nos vemos a las 8 en el bar de siempre?");
+  assertEqual(r.verdict, "safe");
+});
+
+test("smsModule: los SMS de código 2FA legítimos NO se marcan", async () => {
+  // Es el SMS legítimo más frecuente que existe. La lista antigua incluía "codigo de
+  // verificacion" y "contraseña" a secas, así que marcaba sospechoso medio buzón de la gente.
+  for (const s of [
+    "Tu codigo de verificacion es 847362. No lo compartas con nadie.",
+    "Your verification code is 483920. Do not share it.",
+    "Tu contraseña de Netflix se ha cambiado correctamente.",
+  ]) {
+    const r = await checkSms(s);
+    assert(!r.flags.includes("credential_request"), `no debería marcar: ${s}`);
+    assertEqual(r.verdict, "safe");
+  }
+});
+
+test("smsModule: pedir que introduzcas credenciales sí se marca", async () => {
+  const r = await checkSms("Su cuenta esta bloqueada. Introduce tu contraseña en https://verificar-cuenta.top/login");
+  assert(r.flags.includes("credential_request"), "una petición real de credenciales debe marcarse");
+});
+
+test("smsModule: enlace legítimo del dominio .gob.es de la administración no es suplantación", async () => {
+  const r = await checkSms("Su cita con la DGT esta confirmada para el 14/05. Mas info en https://sede.dgt.gob.es");
+  assert(!r.flags.includes("brand_domain_mismatch"), "sede.dgt.gob.es es el dominio real de la DGT");
   assertEqual(r.verdict, "safe");
 });
 
@@ -183,6 +264,20 @@ test("secretsModule: clean code has no findings", () => {
   const r = scanSecrets("function add(a, b) { return a + b; }");
   assertEqual(r.findings.length, 0);
   assertEqual(r.verdict, "safe");
+});
+
+test("secretsModule: los placeholders de documentación no se marcan como claves reales", () => {
+  const r = scanSecrets(
+    'const OPENAI_KEY = "sk-XXXXXXXXXXXXXXXXXXXXXXXX";\napi_key: "YOUR_API_KEY_HERE"\ntoken: "<tu-token-aqui>"'
+  );
+  assertEqual(r.findings.length, 0);
+  assertEqual(r.verdict, "safe");
+});
+
+test("secretsModule: la clave publicable de Stripe no se trata como secreto", () => {
+  // pk_live_ está diseñada para ir en el JS público del checkout: avisar de ella era incorrecto.
+  const r = scanSecrets('const stripe = Stripe("pk_live_51H8xAbCdEfGhIjKlMnOpQrStUvWx");');
+  assertEqual(r.findings.length, 0);
 });
 
 test("secretsModule: OpenAI and Anthropic keys detected distinctly", () => {

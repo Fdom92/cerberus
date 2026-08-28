@@ -63,6 +63,62 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Auditoría de falsos positivos (antes de compartir la app públicamente)
+Hasta aquí todo el esfuerzo había ido a *no dejar pasar* amenazas. Antes de publicar se hizo la
+auditoría inversa: un corpus de entradas **legítimas reales** (`tests/fp-audit.html`) contra todos
+los módulos, partiendo de que una herramienta que grita "peligroso" ante cosas normales entrena a
+la gente a ignorarla — y entonces es peor que no tener nada. Salieron **21 falsos positivos**, y se
+corrigieron todos. Los de más impacto:
+
+- **SMS marcaba los códigos 2FA legítimos.** `CREDENTIAL_WORDS` incluía "codigo de verificacion",
+  "contraseña" y "password" a secas, así que "Tu código de verificación es 847362" — probablemente
+  el SMS legítimo más frecuente que existe — salía como sospechoso, igual que "Tu contraseña se ha
+  cambiado correctamente". La lista pasa a contener solo frases que **piden** la credencial
+  ("introduce tu", "verifica tu cuenta"). Entregar un código es normal; pedir que lo introduzcas
+  en algún sitio es lo que delata el phishing.
+- **Cualquier dominio con tilde se marcaba como homógrafo.** `URL.hostname` devuelve punycode, así
+  que la comprobación `host.includes("xn--")` marcaba `mañana.es`, `münchen.de` y `café.fr` como
+  ataque — muy relevante en español. Se escribió un **decodificador punycode a mano** (`js/punycode.js`,
+  RFC 3492) para poder mirar el dominio real: ahora solo se marca si se **mezclan alfabetos** dentro
+  de una etiqueta (`аpple.com` con 'а' cirílica) o si una etiqueta es enteramente no latina pero
+  todas sus letras imitan latinas (`аррӏе.com` se lee "apple"). Un dominio ruso legítimo como
+  `россия.рф` contiene letras sin sosia latino, y por eso no salta.
+- **El '@' de la ruta o la query se confundía con el de userinfo.** Se comprobaba sobre la URL
+  entera, así que `?email=juan@example.com` o un paquete npm `paquete@1.0.0` (jsDelivr) se
+  marcaban. Ahora solo cuenta `url.username`/`url.password`, que es el '@' que realmente oculta
+  el host.
+- **Todo instalador legítimo salía "dangerous".** Prácticamente cualquier instalador (NSIS, Inno
+  Setup, Electron) va comprimido y supera el umbral de entropía. El flag se renombró a
+  `packed_executable`, es informativo y ya **no cambia el veredicto** por sí solo: solo agrava
+  cuando el archivo además venía disfrazado con otra extensión.
+- **Correo marcaba los boletines normales.** Un `Return-Path` del proveedor de envío y un
+  `Reply-To` distinto son el comportamiento estándar de Mailchimp/SendGrid y de cualquier lista de
+  correo (pesos bajados 20→8 y 25→10), y mencionar una marca de pasada ("síguenos en Facebook") no
+  es suplantarla: `brand_domain_mismatch` ahora exige que el mensaje además **se presente** como esa
+  entidad (marca en el nombre mostrado, o tono de aviso oficial).
+- **El enlace legítimo de la DGT se marcaba como suplantación**, porque la lista tenía `dgt.es` pero
+  el dominio real es `dgt.gob.es`. Añadidos los `.gob.es` de todas las administraciones.
+- **Un TLD abusado bastaba para sospechar** (30 pts): `abc.xyz`, que es de Alphabet, salía marcado.
+  Bajado a 15 — suma, pero no alcanza el umbral en solitario.
+- **Los placeholders de documentación se marcaban como claves reales** (`sk-XXXXXXXX`,
+  `api_key: "YOUR_API_KEY_HERE"`). Filtro de placeholders deliberadamente **conservador**: no filtra
+  por subcadenas que aparecen dentro de claves legítimas ("abcdef" es hex normal), porque es peor
+  ocultar una clave real que mostrar un placeholder de vez en cuando.
+- **La clave *publishable* de Stripe** (`pk_live_`) se trataba como secreto filtrado, cuando está
+  diseñada para ir en el JavaScript público del checkout. Eliminada del escáner.
+- **WebRTC daba "fuga detectada" en conexiones dual-stack normales**, al comparar la IPv6 que ve el
+  STUN con la IPv4 de la petición HTTPS. Ahora solo compara direcciones de la misma familia.
+- **DNS marcaba sospechosa cualquier web sin correo.** Un dominio sin MX no envía email: que no
+  tenga SPF/DMARC es lo esperable, no un problema. Solo se evalúa la higiene de correo si el
+  dominio **tiene** MX (`github.io` pasó de sospechoso a seguro).
+- Menor: el decodificador convertía palabras normales ("test", "deadbeef") en garabatos y los
+  presentaba como hallazgo; ahora exige que el resultado parezca texto de verdad. Añadidas firmas
+  WebP/HEIC/AVIF/SQLite (las fotos de iPhone y las imágenes web caían en "desconocido"), colocadas
+  **antes** de MP4 porque comparten la caja `ftyp`.
+
+Resultado: **0 falsos positivos** en el corpus, y todas las detecciones reales siguen funcionando
+(se verificó con una batería de phishing/malware auténtico después de cada cambio). 42 tests.
+
 ## Repaso de gaps tras el fix de SMS — 6 huecos más cerrados
 Después del fix de Seg. Social se hizo un repaso del resto de módulos buscando el mismo patrón (heurística demasiado estrecha, lista desincronizada, o código muerto). Encontrados y arreglados:
 
