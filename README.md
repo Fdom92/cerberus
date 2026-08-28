@@ -8,15 +8,15 @@ A local-first security command center — a Progressive Web App that runs in you
 
 Most "security checker" tools are either a paid SaaS dashboard or a sketchy website that wants you to paste your password into a form. Cerberus is neither.
 
-Eight of the twelve tools never touch the network at all. Two more — URLs and Password — do their actual analysis offline and only reach out if you ask them to (a toggle for following redirects, a button for the breached-password check). Only DNS/SPF and the WebRTC leak test are inherently network-bound, since there is nothing to look up otherwise. Every one of those says which service it contacts *before* it contacts it, and nothing sensitive — passwords, JWTs, scanned secrets, WebRTC results — is ever written to storage.
+Six of the twelve tools never touch the network at all. Four more — URLs, SMS, Mail and Password — do their analysis offline and only reach out if you ask them to (one shared toggle for resolving links and checking them against threat lists, a button for the breached-password check). Only DNS/SPF and the WebRTC leak test are inherently network-bound, since there is nothing to look up otherwise. Every one of those says which service it contacts *before* it contacts it, and nothing sensitive — passwords, JWTs, scanned secrets, WebRTC results — is ever written to storage.
 
 ## Tools
 
 | Tool | What it does | Network |
 |---|---|---|
-| **URLs** | Typosquatting, punycode/homograph, IP-literal hosts, `@` tricks; optional redirect resolution + domain-age (RDAP) | Offline by default, opt-in |
-| **Mail** | SPF/DKIM/DMARC parsing, From/Return-Path/Reply-To mismatches, brand impersonation | Offline |
-| **SMS** | Smishing heuristics — urgency language, credential requests, brand/domain mismatch, embedded shortened or suspicious links | Offline |
+| **URLs** | Typosquatting, punycode/homograph, brand-as-subdomain and brand-in-hostname spoofing, IP-literal hosts, `@` tricks; optionally resolves redirects, checks domain age (RDAP) and looks the domain up against Cloudflare's phishing/malware lists | Offline by default, opt-in |
+| **Mail** | SPF/DKIM/DMARC parsing, From/Return-Path/Reply-To mismatches, brand impersonation in the display name and Subject, analysis of links in the body; optional threat-list lookup | Offline, opt-in threat lookup |
+| **SMS** | Smishing heuristics — urgency language, credential requests, brand/domain mismatch, callback-number scams, embedded shortened or suspicious links; optional threat-list lookup on the linked domains | Offline, opt-in threat lookup |
 | **DNS / SPF** | Looks up a domain's MX, SPF and DMARC records to see whether it's protected against being spoofed | Network (Cloudflare DoH) |
 | **Files** | Magic-byte signature detection vs. declared extension, SHA-256, Shannon entropy (flags packed/encrypted executables) | Offline |
 | **EXIF** | Reads JPEG metadata — camera, timestamp, and GPS coordinates before you share a photo | Offline |
@@ -59,7 +59,7 @@ No install, no build:
 python3 -m http.server 8080 --directory public
 ```
 
-Open `http://localhost:8080`. Every tool works offline from there; the URL and WebRTC tools need real network access for their opt-in checks.
+Open `http://localhost:8080`. Every tool works offline from there; the URL, SMS, Mail, Password, DNS and WebRTC tools need real network access for their opt-in checks.
 
 ## Testing
 
@@ -91,4 +91,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Design notes
 
-Longer write-ups of specific decisions — why a CORS-proxy opt-in instead of a backend, why the typosquat distance threshold is 1 not 2, how the AXML/plist parsers were validated — live in [`docs/superpowers/specs/`](docs/superpowers/specs/).
+Longer write-ups of specific decisions — why a CORS-proxy opt-in instead of a backend, why threat-list hits count but misses never reassure, how the AXML/plist parsers were validated — live in [`docs/superpowers/specs/`](docs/superpowers/specs/).

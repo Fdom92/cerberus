@@ -20,7 +20,7 @@
     <span>CERBERUS</span>
   </div>
   <div class="topbar-actions">
-    <span class="badge-offline" id="netBadge" title="Estado del interruptor de red del módulo URLs. Correo, SMS, Archivos, EXIF, Secretos, Contraseña y JWT son siempre locales; DNS y Fuga WebRTC contactan servicios externos al pulsar su botón.">URL: sin red</span>
+    <span class="badge-offline" id="netBadge" title="Estado del interruptor de red compartido por URLs, SMS y Correo. Archivos, EXIF, Secretos, Contraseña y JWT son siempre locales; DNS y Fuga WebRTC contactan servicios externos al pulsar su botón.">red: desactivada</span>
     <button class="icon-btn" id="historyBtn" aria-label="Historial" title="Historial">🕘</button>
   </div>
 </header>
@@ -127,11 +127,11 @@
     </form>
 
     <label class="toggle">
-      <input type="checkbox" id="netToggle">
-      <span>Activar comprobaciones de red (resolver destino final + WHOIS/RDAP)</span>
+      <input type="checkbox" class="net-toggle">
+      <span>Activar comprobaciones de red (destino final, antigüedad del dominio y listas de amenazas)</span>
     </label>
-    <p class="netwarn" id="netWarn" hidden>
-      Al activarlo, la URL analizada se envía a un proxy CORS público (allorigins.win) y a un servicio RDAP (rdap.org) para resolverla. No se envía nada más de tu dispositivo.
+    <p class="netwarn net-warn" hidden>
+      Al activarlo, el dominio se consulta contra las listas de phishing y malware de <strong>Cloudflare</strong>, y se usan un proxy CORS público (allorigins.win) y RDAP (rdap.org) para resolver el destino. No se envía nada más de tu dispositivo.
     </p>
 
     <div id="urlResult" class="result" hidden></div>
@@ -176,6 +176,13 @@
       <button type="button" class="sample-btn" id="sampleMailSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleMailMalicious">🚩 Probar malicioso</button>
     </div>
+    <label class="toggle">
+      <input type="checkbox" class="net-toggle">
+      <span>Comprobar los enlaces contra listas de amenazas (requiere red)</span>
+    </label>
+    <p class="netwarn net-warn" hidden>
+      Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
+    </p>
     <form id="mailForm">
       <textarea id="mailInput" rows="8" placeholder="From: ...&#10;Return-Path: ...&#10;Authentication-Results: ...&#10;..." required></textarea>
       <button type="submit">Analizar cabeceras</button>
@@ -191,6 +198,13 @@
       <button type="button" class="sample-btn" id="sampleSmsSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleSmsMalicious">🚩 Probar malicioso</button>
     </div>
+    <label class="toggle">
+      <input type="checkbox" class="net-toggle">
+      <span>Comprobar los enlaces contra listas de amenazas (requiere red)</span>
+    </label>
+    <p class="netwarn net-warn" hidden>
+      Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
+    </p>
     <form id="smsForm">
       <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
       <button type="submit">Analizar mensaje</button>
@@ -322,7 +336,7 @@
 </main>
 
 <footer class="footer">
-  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">URL: sin red</span></span>
+  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">red: desactivada</span></span>
 </footer>
 
 <script type="module" src="js/app.js"></script>

@@ -1,8 +1,12 @@
 import { saveResult } from "../db.js";
 import { analyzeHostnameScripts } from "../punycode.js";
 import { BRAND_DOMAINS } from "../brandDomains.js";
+import { checkDomainReputation } from "../reputation.js";
 
 const FLAG_POINTS = {
+  // Aparecer en listas de amenazas no es una heurística sobre la forma del dominio: es un
+  // hecho contrastado sobre ESE dominio. Por sí solo debe bastar para marcar peligro.
+  threat_intel_blocked: 80,
   homograph: 50,
   typosquat: 50,
   brand_subdomain_spoof: 50,
@@ -20,6 +24,8 @@ const FLAG_POINTS = {
 };
 
 const FLAG_LABELS = {
+  threat_intel_blocked:
+    "Este dominio está en las listas de phishing/malware de Cloudflare. No es una sospecha por la forma del enlace: está reportado como malicioso. No lo abras",
   homograph: "El dominio usa caracteres que imitan letras latinas — posible homógrafo",
   typosquat: "Muy parecido a un dominio conocido — posible typosquatting",
   brand_subdomain_spoof: "El dominio real no es el de la marca: la marca aparece solo como subdominio, y lo que manda es lo que va justo antes del .com/.es final",
@@ -256,6 +262,7 @@ export async function checkUrl(rawInput, { networkEnabled }) {
   let finalUrl = null;
   let httpCode = null;
   let ageDays = null;
+  let reputation = null;
 
   if (networkEnabled) {
     const resolved = await resolveDestination(url.href);
@@ -270,6 +277,10 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     ageDays = await domainAge(targetHost);
     if (ageDays === null) flags.push("domain_age_unknown");
     else if (ageDays < 30) flags.push("domain_new");
+
+    // Se consulta el destino final: de nada sirve mirar la reputación del acortador.
+    reputation = (await checkDomainReputation(targetHost)).status;
+    if (reputation === "blocked") flags.push("threat_intel_blocked");
   }
 
   const { riskScore, verdict } = scoreFlags(flags);
@@ -280,6 +291,7 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     finalUrl,
     httpCode,
     ageDays,
+    reputation,
     flags,
     riskScore,
     verdict,

@@ -63,6 +63,42 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Reputación: de heurística a dato contrastado (`js/reputation.js`)
+Hasta aquí todo eran heurísticas: se juzgaba **la forma** del enlace. Esto añade lo otro — saber si
+**ese dominio concreto** está reportado como malicioso — que es el único salto real hacia un
+veredicto.
+
+**Cómo, sin backend ni clave de API:** el resolver de seguridad de Cloudflare (1.1.1.2) resuelve DNS
+normal pero devuelve `0.0.0.0` con el error extendido `EDE(16): Censored` cuando el dominio está en
+sus listas de phishing/malware. La propia respuesta DNS es el veredicto. No hay que registrarse, y
+solo sale el dominio — exactamente lo que ya sale al resolver cualquier enlace. Misma filosofía que
+la comprobación de contraseñas con HIBP.
+
+**Medido antes de integrarlo** (muestras de listas públicas, no promesas del proveedor):
+
+| Muestra | Resultado |
+|---|---|
+| 20 dominios de **phishing** reales | **18 bloqueados**, 1 ya dado de baja, 1 escapado |
+| 9 dominios de **distribución de malware** | 1 bloqueado — el resto es infraestructura legítima abusada (`pages.dev`, `cloudflarestorage.com`) que Cloudflare no puede tumbar |
+| 12 dominios legítimos | **0 falsos positivos** |
+
+Es decir: **muy buena cobertura justo en el caso de uso de esta app** (phishing), pobre en malware.
+
+**La regla que gobierna su uso es la asimetría.** Un acierto es prueba fuerte (80 puntos, basta por
+sí solo para `dangerous`). No encontrar nada **no es prueba de nada** y nunca resta puntos: el
+phishing recién creado tarda horas o días en entrar en las listas. La interfaz lo dice con esas
+palabras — *"no aparece en las listas… eso no garantiza que sea seguro"*— porque presentarlo como
+"limpio" a secas sería la falsa tranquilidad que toda esta serie de auditorías intenta evitar.
+
+Integrado en **URLs, SMS y Correo** bajo el mismo interruptor de red, ahora compartido y sincronizado
+entre los tres paneles (antes vivía solo en URLs). El valor se ve mejor en SMS: un mensaje sin
+ninguna señal offline —sin urgencia, sin marca, con un dominio de aspecto normal— pasa de `safe (0)`
+a `dangerous (80)` cuando el dominio está realmente reportado. Un caso que las heurísticas no podían
+cazar de ninguna manera.
+
+Otro efecto: `NXDOMAIN` (dominio inexistente) se distingue explícitamente de "bloqueado". Confundirlos
+convertiría cualquier dominio caducado en una "amenaza confirmada".
+
 ## Auditoría de evasiones (red team) — de 18 coladas a 3
 Las auditorías anteriores comprobaban que no diera falsos positivos y que no fuera vulnerable.
 Faltaba la contraria: **atacarla a propósito**. `tests/evasion-audit.html` lanza 27 ataques reales

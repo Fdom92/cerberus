@@ -2,8 +2,10 @@ import { saveResult } from "../db.js";
 import { offlineUrlFlags, FLAG_LABELS as URL_FLAG_LABELS, FLAG_POINTS as URL_FLAG_POINTS } from "./urlModule.js";
 import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../textHeuristics.js";
 import { BRAND_DOMAINS } from "../brandDomains.js";
+import { checkDomainsReputation } from "../reputation.js";
 
 const FLAG_POINTS = {
+  threat_intel_blocked: 80,
   display_name_spoof: 50,
   brand_domain_mismatch: 40,
   spf_fail: 30,
@@ -96,7 +98,7 @@ function mentionedBrandDomains(text) {
     .flatMap(([, domains]) => domains);
 }
 
-export async function checkMail(rawInput) {
+export async function checkMail(rawInput, { networkEnabled = false } = {}) {
   const { headerBlock, body } = splitHeadersAndBody(rawInput);
   const headers = parseHeaders(headerBlock);
   const flags = [];
@@ -148,6 +150,7 @@ export async function checkMail(rawInput) {
   // suplantando una entidad conocida (mismo patrón que smsModule.js sobre el texto del SMS).
   const bodyUrlDetails = [];
   const bodyUrlHosts = [];
+  let reputations = [];
   if (body.trim()) {
     if (matchesAny(body, OFFICIAL_NOTICE_WORDS)) flags.push("official_notice_language");
 
@@ -160,6 +163,13 @@ export async function checkMail(rawInput) {
       } catch {
         /* ignore */
       }
+    }
+
+    // Igual que en SMS: solo con las comprobaciones de red activadas, porque implica enviar
+    // los dominios enlazados en el correo a Cloudflare.
+    if (networkEnabled && bodyUrlHosts.length > 0) {
+      reputations = await checkDomainsReputation(bodyUrlHosts);
+      if (reputations.some((r) => r.status === "blocked")) flags.push("threat_intel_blocked");
     }
 
     // Mencionar una marca no es suplantarla: un boletín legítimo dice "síguenos en Facebook"
@@ -183,6 +193,7 @@ export async function checkMail(rawInput) {
     returnPathDomain,
     replyToDomain,
     bodyUrls: bodyUrlDetails,
+    reputations,
     flags,
     riskScore,
     verdict,

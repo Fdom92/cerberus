@@ -2,6 +2,7 @@ import { saveResult } from "../db.js";
 import { offlineUrlFlags, FLAG_LABELS as URL_FLAG_LABELS, FLAG_POINTS as URL_FLAG_POINTS } from "./urlModule.js";
 import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../textHeuristics.js";
 import { BRAND_DOMAINS } from "../brandDomains.js";
+import { checkDomainsReputation } from "../reputation.js";
 
 const URGENCY_WORDS = [
   "urgente", "urgent", "inmediat", "immediat", "suspendid", "suspended",
@@ -35,6 +36,7 @@ const SHORTENERS = [
 ];
 
 const FLAG_POINTS = {
+  threat_intel_blocked: 80,
   brand_domain_mismatch: 40,
   callback_number: 30,
   credential_request: 30,
@@ -71,7 +73,7 @@ function mentionedBrandDomains(text) {
     .flatMap(([, domains]) => domains);
 }
 
-export async function checkSms(rawText) {
+export async function checkSms(rawText, { networkEnabled = false } = {}) {
   const flags = [];
   const urls = extractUrls(rawText);
 
@@ -104,6 +106,14 @@ export async function checkSms(rawText) {
     }
   }
 
+  // Solo si el usuario ha activado las comprobaciones de red: consultar la reputación
+  // implica enviar el dominio del enlace a Cloudflare, y este módulo es offline por defecto.
+  let reputations = [];
+  if (networkEnabled && urlHosts.length > 0) {
+    reputations = await checkDomainsReputation(urlHosts);
+    if (reputations.some((r) => r.status === "blocked")) flags.push("threat_intel_blocked");
+  }
+
   const expectedDomains = mentionedBrandDomains(rawText);
   if (expectedDomains.length > 0 && urlHosts.length > 0) {
     const anyMatch = urlHosts.some((host) => expectedDomains.some((d) => host === d || host.endsWith(`.${d}`)));
@@ -117,6 +127,7 @@ export async function checkSms(rawText) {
     type: "sms",
     text: rawText,
     urls: urlDetails,
+    reputations,
     flags,
     riskScore,
     verdict,

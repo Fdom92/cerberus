@@ -83,28 +83,34 @@ function initNav() {
 
 // ---- Network toggle ----
 function initNetToggle() {
-  const toggle = document.getElementById("netToggle");
-  const warn = document.getElementById("netWarn");
+  // El mismo interruptor aparece en URLs, SMS y Correo: los tres pueden hacer consultas de
+  // red, así que comparten preferencia y se mantienen sincronizados entre sí.
+  const toggles = [...document.querySelectorAll(".net-toggle")];
+  const warns = [...document.querySelectorAll(".net-warn")];
   const badge = document.getElementById("netBadge");
   const netState = document.getElementById("netState");
 
   const saved = localStorage.getItem(NET_PREF_KEY) === "1";
-  toggle.checked = saved;
+  toggles.forEach((t) => (t.checked = saved));
   updateNetUi(saved);
 
-  toggle.addEventListener("change", () => {
-    localStorage.setItem(NET_PREF_KEY, toggle.checked ? "1" : "0");
-    updateNetUi(toggle.checked);
-  });
+  toggles.forEach((toggle) =>
+    toggle.addEventListener("change", () => {
+      localStorage.setItem(NET_PREF_KEY, toggle.checked ? "1" : "0");
+      toggles.forEach((t) => (t.checked = toggle.checked));
+      updateNetUi(toggle.checked);
+    })
+  );
 
   function updateNetUi(enabled) {
-    // El indicador refleja SOLO el interruptor del módulo URLs. Antes ponía "100% local" en el
-    // pie de forma permanente, lo cual era falso: DNS, la comprobación de contraseña filtrada y
-    // la de fuga WebRTC contactan servicios externos aunque este interruptor esté apagado.
-    warn.hidden = !enabled;
-    badge.textContent = enabled ? "URL: con red" : "URL: sin red";
+    warns.forEach((w) => (w.hidden = !enabled));
+    // El indicador refleja SOLO este interruptor (URLs, SMS y Correo). DNS, la comprobación
+    // de contraseña filtrada y la de fuga WebRTC contactan servicios externos aunque esté
+    // apagado, por eso el texto no promete que la app entera sea local.
+    const label = enabled ? "red: activada" : "red: desactivada";
+    badge.textContent = label;
     badge.classList.toggle("online", enabled);
-    netState.textContent = enabled ? "URL: con red" : "URL: sin red";
+    netState.textContent = label;
   }
 }
 
@@ -152,7 +158,21 @@ function renderUrlResult(el, r) {
     ${chain}
     <ul class="flags">${flagsHtml(r.flags)}</ul>
     ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
+    ${reputationNote(r.reputation)}
   `;
+}
+
+// La señal de las listas de amenazas es asimétrica y la interfaz tiene que decirlo: que un
+// dominio no aparezca en ellas no significa nada — el phishing recién creado tarda horas o
+// días en entrar. Presentarlo como "limpio" a secas daría una falsa tranquilidad.
+function reputationNote(reputation) {
+  if (reputation === "clean") {
+    return `<div class="meta">No aparece en las listas de amenazas de Cloudflare — <strong>eso no garantiza que sea seguro</strong>: un dominio recién creado aún no está en ninguna lista.</div>`;
+  }
+  if (reputation === "unavailable") {
+    return `<div class="meta">No se pudo consultar la lista de amenazas.</div>`;
+  }
+  return "";
 }
 
 // ---- File module ----
@@ -223,7 +243,7 @@ function initMailForm() {
     resultEl.hidden = false;
     resultEl.innerHTML = '<p class="hint">Analizando cabeceras…</p>';
     try {
-      const r = await checkMail(raw);
+      const r = await checkMail(raw, { networkEnabled: isNetEnabled() });
       const meta = [];
       if (r.fromDomain) meta.push(`From: ${r.fromDomain}`);
       if (r.returnPathDomain) meta.push(`Return-Path: ${r.returnPathDomain}`);
@@ -256,15 +276,19 @@ function initSmsForm() {
     resultEl.hidden = false;
     resultEl.innerHTML = '<p class="hint">Analizando…</p>';
     try {
-      const r = await checkSms(raw);
+      const r = await checkSms(raw, { networkEnabled: isNetEnabled() });
       const urlsHtml = r.urls.length
         ? `<div class="meta">Enlaces detectados: ${r.urls.map((u) => escapeHtml(u.href)).join(", ")}</div>`
+        : "";
+      const repNote = (r.reputations || []).length && !r.flags.includes("threat_intel_blocked")
+        ? reputationNote("clean")
         : "";
       resultEl.innerHTML = `
         <span class="verdict ${r.verdict}">${r.verdict}</span>
         <div class="score">Riesgo: ${r.riskScore} / 100</div>
         <ul class="flags">${flagsHtml(r.flags)}</ul>
         ${urlsHtml}
+        ${repNote}
       `;
     } catch (err) {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
