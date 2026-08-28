@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Icono "maskable": el fondo llega a sangre (sin esquinas redondeadas propias) porque el
+       sistema operativo aplica su propia máscara. Si el icono se redondea a sí mismo, Android
+       redondea encima y queda hundido respecto al resto de iconos.
+       El escudo va al 82% para caber en la zona segura (círculo del 80% del lienzo). -->
+  <rect width="192" height="192" fill="#0b1220"/>
+  <g transform="translate(96,96) scale(0.82) translate(-96,-96)">
+    <path d="M96 24 L156 48 V96 C156 132 130 156 96 168 C62 156 36 132 36 96 V48 Z"
+          fill="none" stroke="#34d399" stroke-width="9" stroke-linejoin="round"/>
+    <path d="M96 52 L96 130 M72 78 L120 78" stroke="#34d399" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="96" cy="96" r="6.5" fill="#34d399"/>
+  </g>
+</svg>
