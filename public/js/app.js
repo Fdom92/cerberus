@@ -135,6 +135,7 @@ function initUrlForm() {
     try {
       const result = await checkUrl(raw, { networkEnabled: isNetEnabled() });
       renderUrlResult(resultEl, result);
+      wireEnableNetButtons(resultEl, () => form.requestSubmit());
     } catch (err) {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }
@@ -159,7 +160,36 @@ function renderUrlResult(el, r) {
     <ul class="flags">${flagsHtml(r.flags)}</ul>
     ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
     ${reputationNote(r.reputation)}
+    ${offlineOnlyNotice()}
   `;
+}
+
+// Decir "safe" tras un análisis a medias es engañoso: si las comprobaciones de red están
+// apagadas no se ha mirado ninguna lista de amenazas, y el usuario no tiene forma de saberlo
+// (el interruptor queda arriba, fuera de vista, y está apagado por defecto). El aviso va
+// dentro del propio resultado, con un botón que lo activa y repite el análisis en un toque.
+function offlineOnlyNotice() {
+  if (isNetEnabled()) return "";
+  return `
+    <div class="netwarn offline-notice">
+      <span>Análisis <strong>solo offline</strong>: no se ha comprobado contra listas de amenazas, así que
+      este resultado no descarta que el enlace esté reportado como phishing.</span>
+      <button type="button" class="sample-btn enable-net-btn">Activar comprobación en red y repetir</button>
+    </div>`;
+}
+
+// Conecta los botones "Activar y repetir" que aparecen dentro de un resultado.
+function wireEnableNetButtons(container, rerun) {
+  container.querySelectorAll(".enable-net-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      localStorage.setItem(NET_PREF_KEY, "1");
+      document.querySelectorAll(".net-toggle").forEach((t) => {
+        t.checked = true;
+        t.dispatchEvent(new Event("change"));
+      });
+      rerun();
+    })
+  );
 }
 
 // La señal de las listas de amenazas es asimétrica y la interfaz tiene que decirlo: que un
@@ -253,7 +283,9 @@ function initMailForm() {
         <div class="score">Riesgo: ${r.riskScore} / 100</div>
         <ul class="flags">${flagsHtml(r.flags)}</ul>
         ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
+        ${(r.bodyUrls || []).length ? offlineOnlyNotice() : ""}
       `;
+      wireEnableNetButtons(resultEl, () => form.requestSubmit());
     } catch (err) {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }
@@ -289,7 +321,9 @@ function initSmsForm() {
         <ul class="flags">${flagsHtml(r.flags)}</ul>
         ${urlsHtml}
         ${repNote}
+        ${r.urls.length ? offlineOnlyNotice() : ""}
       `;
+      wireEnableNetButtons(resultEl, () => form.requestSubmit());
     } catch (err) {
       resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
     }

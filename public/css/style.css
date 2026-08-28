@@ -432,3 +432,16 @@ button.danger-btn {
 @media (min-width: 600px) {
   .row { flex-wrap: nowrap; }
 }
+
+.offline-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+.offline-notice .enable-net-btn {
+  border-style: solid;
+  border-color: var(--warn);
+  color: var(--warn);
+}

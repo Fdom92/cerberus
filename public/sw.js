@@ -1,4 +1,4 @@
-const CACHE = "cerberus-v11";
+const CACHE = "cerberus-v12";
 const SHELL = [
   "./",
   "./index.html",
