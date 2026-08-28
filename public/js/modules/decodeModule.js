@@ -3,7 +3,7 @@
 // mostraban como si fueran un hallazgo. Ahora se exige que el resultado parezca texto de verdad.
 function looksLikeText(str) {
   if (!str || str.length < 2) return false;
-  if (str.includes("�")) return false; // carácter de reemplazo: no era UTF-8 válido
+  if (str.includes("\uFFFD")) return false; // carácter de reemplazo: no era UTF-8 válido
   let plausible = 0;
   for (const ch of str) {
     const code = ch.codePointAt(0);
