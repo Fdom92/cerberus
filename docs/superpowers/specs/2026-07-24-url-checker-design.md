@@ -196,6 +196,39 @@ Cada panel de herramienta tiene 1-2 botones que rellenan (y para formularios, en
 - Timeline hop-a-hop completa de redirects (requeriría proxy propio, no genérico)
 - Sync de historial entre dispositivos (queda local al dispositivo/navegador)
 - EXIF: solo JPEG por ahora (PNG usa un chunk `eXIf` distinto, no implementado)
+- Internacionalización — evaluada y aparcada, ver abajo
+
+## Internacionalización (evaluada, no implementada)
+Anotado tras medir el alcance real. **El coste está muy mal repartido entre las dos mitades**, y esa
+es la razón de aparcarlo, no el tamaño total:
+
+- **La interfaz es trabajo mecánico:** ~160 textos únicos (unos 80 en `index.html`, **52 etiquetas de
+  flags** repartidas por 8 módulos, ~27 mensajes de estado/error en `app.js`). Una sesión.
+- **La detección no se traduce, se reinvestiga.** `OFFICIAL_NOTICE_WORDS` está calcado del lenguaje
+  de la administración española ("trámite pendiente"); un phishing alemán no dice eso. Las 21 marcas
+  de `brandDomains.js` son de España (Seg. Social, DGT, Correos, AEAT, BBVA) y fuera harían falta
+  Deutsche Post/Sparkasse/Finanzamt, Royal Mail/HMRC, USPS/IRS… Los `.gob.es` no tienen equivalente
+  automático.
+
+**La trampa que decide el diseño:** si se traduce solo la interfaz y se dejan las heurísticas
+españolas, un angloparlante recibe una herramienta que *parece funcionar y falla en silencio* — un
+smishing de Royal Mail le saldría `safe`. Eso es peor que no ofrecer el idioma, y es exactamente el
+problema contra el que van las auditorías de este documento. Regla, por tanto: **un idioma solo se
+ofrece si su paquete de heurísticas está hecho, no solo su UI.**
+
+Estructura prevista si se retoma — un fichero por idioma con textos **y** datos de detección juntos,
+para que sea imposible añadir un idioma a medias:
+
+```
+public/js/i18n/
+  es.js      textos UI + heurísticas + marcas (España)
+  en.js      textos UI + heurísticas + marcas (US/UK)
+  index.js   detección con navigator.language y carga
+```
+
+Los módulos recibirían el paquete activo en vez de tener las listas hardcoded. El inglés parte con
+ventaja: `URGENCY_WORDS`/`CREDENTIAL_WORDS`/`LURE_WORDS` ya son bilingües. Solo merece la pena si la
+app se comparte fuera de España.
 
 ## Arquitectura
 - Estático puro: `index.html` + `manifest.webmanifest` + `sw.js` + `css/` + `js/`, sin servidor, sin build step
