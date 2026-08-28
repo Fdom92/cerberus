@@ -98,10 +98,13 @@ function initNetToggle() {
   });
 
   function updateNetUi(enabled) {
+    // El indicador refleja SOLO el interruptor del módulo URLs. Antes ponía "100% local" en el
+    // pie de forma permanente, lo cual era falso: DNS, la comprobación de contraseña filtrada y
+    // la de fuga WebRTC contactan servicios externos aunque este interruptor esté apagado.
     warn.hidden = !enabled;
-    badge.textContent = enabled ? "red activa" : "local";
+    badge.textContent = enabled ? "URL: con red" : "URL: sin red";
     badge.classList.toggle("online", enabled);
-    netState.textContent = enabled ? "red activada" : "red desactivada";
+    netState.textContent = enabled ? "URL: con red" : "URL: sin red";
   }
 }
 
@@ -478,7 +481,9 @@ function initExifTool() {
       const buf = await file.arrayBuffer();
       const exif = parseExif(buf);
       if (!exif.hasExif) {
-        resultEl.innerHTML = `<p class="hint">Sin datos EXIF (o no es JPEG con metadatos) — no se detectaron cámara, fecha ni GPS.</p>`;
+        resultEl.innerHTML = exif.malformed
+          ? `<p class="hint">Los metadatos de esta imagen están corruptos o incompletos y no se han podido leer.</p>`
+          : `<p class="hint">Sin datos EXIF (o no es JPEG con metadatos) — no se detectaron cámara, fecha ni GPS.</p>`;
         return;
       }
       const gpsHtml = exif.gps

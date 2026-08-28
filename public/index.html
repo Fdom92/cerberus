@@ -20,7 +20,7 @@
     <span>CERBERUS</span>
   </div>
   <div class="topbar-actions">
-    <span class="badge-offline" id="netBadge">local</span>
+    <span class="badge-offline" id="netBadge" title="Estado del interruptor de red del módulo URLs. Correo, SMS, Archivos, EXIF, Secretos, Contraseña y JWT son siempre locales; DNS y Fuga WebRTC contactan servicios externos al pulsar su botón.">URL: sin red</span>
     <button class="icon-btn" id="historyBtn" aria-label="Historial" title="Historial">🕘</button>
   </div>
 </header>
@@ -322,7 +322,7 @@
 </main>
 
 <footer class="footer">
-  <span>100% local · sin cuentas · <span id="netState">red desactivada</span></span>
+  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">URL: sin red</span></span>
 </footer>
 
 <script type="module" src="js/app.js"></script>

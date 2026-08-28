@@ -106,8 +106,11 @@ async function scanStringsAndSecrets(file) {
 }
 
 function scoreManifest(permissions, severityMap) {
+  // Object.hasOwn y no `severityMap[p]`: los nombres de permiso salen del manifest del APK,
+  // así que uno llamado "toString" o "constructor" heredaría un valor del prototipo y se
+  // marcaría como peligroso sin estar en la lista.
   const flagged = permissions
-    .filter((p) => severityMap[p])
+    .filter((p) => Object.hasOwn(severityMap, p))
     .map((p) => ({ name: p, severity: severityMap[p] }));
   const highCount = flagged.filter((f) => f.severity === "high").length;
   const medCount = flagged.filter((f) => f.severity === "medium").length;

@@ -67,7 +67,20 @@ function levenshtein(a, b) {
 function parseUrl(raw) {
   let input = raw.trim();
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) input = "https://" + input;
-  return new URL(input);
+
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    // Sin esto salía a la interfaz el mensaje interno del navegador en inglés
+    // ("Failed to construct 'URL'"), que no le dice nada a quien la usa.
+    throw new Error("No parece una dirección web válida. Revisa que esté completa.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`Solo se pueden analizar direcciones http:// o https:// (esta usa ${url.protocol})`);
+  }
+  if (!url.hostname) throw new Error("La dirección no incluye ningún dominio.");
+  return url;
 }
 
 function offlineHeuristics(url, knownDomains) {

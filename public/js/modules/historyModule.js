@@ -61,8 +61,11 @@ export async function renderHistory(listEl) {
 }
 
 function renderDetail(item) {
+  // Escapado obligatorio: hoy solo llegan claves internas, pero este es un sink de HTML y
+  // basta con que un módulo futuro guarde un flag con datos del archivo analizado para
+  // convertirlo en XSS almacenado (el historial persiste en IndexedDB y se re-renderiza).
   const flags = (item.flags || [])
-    .map((f) => `<li class="warn">${ALL_LABELS[f] || f}</li>`)
+    .map((f) => `<li class="warn">${escapeHtml(ALL_LABELS[f] || f)}</li>`)
     .join("");
   const extra = item.raw?.finalUrl
     ? `<div class="chain">${escapeHtml(item.raw.input)}<span class="arrow">→</span>${escapeHtml(item.raw.finalUrl)}</div>`

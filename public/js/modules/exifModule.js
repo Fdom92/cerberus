@@ -80,9 +80,20 @@ function findApp1(view) {
 }
 
 export function parseExif(arrayBuffer) {
+  try {
+    return parseExifUnsafe(arrayBuffer);
+  } catch {
+    // Una foto truncada o un fichero manipulado hacía que el parser leyera fuera de límites y
+    // el RangeError del navegador acababa en pantalla. Se trata como "no se pudo leer".
+    return { hasExif: false, malformed: true };
+  }
+}
+
+function parseExifUnsafe(arrayBuffer) {
   const view = new DataView(arrayBuffer);
+  if (view.byteLength < 12) return { hasExif: false };
   const tiffStart = findApp1(view);
-  if (tiffStart === null) return { hasExif: false };
+  if (tiffStart === null || tiffStart + 8 > view.byteLength) return { hasExif: false };
 
   const byteOrder = view.getUint16(tiffStart);
   const littleEndian = byteOrder === 0x4949;

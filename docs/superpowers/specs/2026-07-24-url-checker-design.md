@@ -63,6 +63,37 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Auditoría de publicación (entradas hostiles y veracidad de las afirmaciones)
+Antes de publicar, una segunda auditoría sobre lo que no cubría la de falsos positivos: que la
+propia app no sea vulnerable y que no afirme cosas que no cumple. `tests/hostile-audit.html`
+lanza payloads XSS, entradas malformadas, ficheros vacíos y un APK manipulado contra todos los
+módulos. Salieron 4 problemas reales:
+
+- **XSS almacenado en el historial.** `renderDetail()` interpolaba los flags sin escapar. Hoy solo
+  llegan claves internas, así que no era explotable — pero el sink estaba vivo y bastaba con que un
+  módulo futuro guardase un flag con datos del fichero analizado. La sonda lo confirmó ejecutando
+  código (`xssFired: true`) y el historial **persiste en IndexedDB**, así que se habría re-ejecutado
+  en cada visita. Escapado.
+- **Contaminación de prototipo en los permisos de APK.** `severityMap[p]` con `p` sacado del
+  manifest: un permiso llamado `toString` o `constructor` heredaba un valor del prototipo, pasaba el
+  filtro y se marcaba como peligroso sin estar en la lista. Corregido con `Object.hasOwn`.
+- **Mensajes de error internos del navegador en pantalla.** Una URL como `http://` o
+  `javascript:alert(1)` propagaba `TypeError: Failed to construct 'URL'` a la interfaz, en inglés.
+  Ahora `parseUrl` valida esquema y dominio y devuelve un mensaje claro; además solo acepta
+  `http`/`https`.
+- **RangeError con imágenes truncadas.** El parser EXIF leía fuera de límites con un JPEG corrupto y
+  el error del navegador acababa en la interfaz. Ahora se captura y se informa de que los metadatos
+  no se han podido leer.
+
+**Veracidad de las afirmaciones.** El pie ponía "100% local · sin cuentas · red desactivada" de
+forma permanente, y el indicador solo reflejaba el interruptor del módulo URLs. Pero DNS, la
+comprobación de contraseña filtrada (HIBP) y la de fuga WebRTC contactan servicios externos aunque
+ese interruptor esté apagado: alguien consultando un dominio veía "100% local · red desactivada"
+mientras el dominio se enviaba a Cloudflare. En una herramienta que se vende como privada eso es
+justo lo que destruye la confianza cuando alguien lo descubre. El pie pasa a "Sin cuentas ni
+servidores propios · cada herramienta indica si necesita red" y el indicador dice explícitamente
+`URL: sin red` / `URL: con red`, que es lo único que realmente representa.
+
 ## Auditoría de falsos positivos (antes de compartir la app públicamente)
 Hasta aquí todo el esfuerzo había ido a *no dejar pasar* amenazas. Antes de publicar se hizo la
 auditoría inversa: un corpus de entradas **legítimas reales** (`tests/fp-audit.html`) contra todos
