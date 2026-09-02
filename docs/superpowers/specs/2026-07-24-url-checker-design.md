@@ -566,3 +566,28 @@ Verificado extremo a extremo decodificando PNG reales, no solo la clasificación
 
 69/69 tests · 0 falsos positivos (incluidos 11 QR legítimos nuevos) · 3/27 evasiones ·
 2/30 campañas · auditoría hostil sin inyección (incluidos payloads XSS por la ruta nueva de QR)
+
+
+### Corrección posterior — el botón "activar y repetir" cambiaba un ajuste de privacidad
+
+Reportado al probar la v1: el interruptor de red aparecía encendido sin haberlo activado.
+
+No era un fallo del valor por defecto (verificado con almacenamiento limpio: apagado). Era el
+botón que sale dentro de un resultado cuando el análisis fue solo offline. Decía **"Activar
+comprobación en red y repetir"** y escribía la preferencia en `localStorage` de forma
+**permanente y para las cuatro herramientas**. El usuario leía "repetir esta comprobación" y
+se quedaba con la red encendida a partir de entonces sin haberlo decidido.
+
+Para un ajuste que determina si los datos salen del dispositivo, eso no vale. Ahora el botón
+dice **"Comprobar también en red, solo esta vez"** y hace exactamente eso: `withNetOnce()`
+aplica la excepción a esa comprobación y la retira en un `finally`, sin tocar nada guardado.
+El interruptor sigue siendo el único sitio donde se toma una decisión duradera.
+
+La preferencia se saca a `public/js/netPref.js` para poder testearla sin montar la interfaz —
+antes vivía suelta en `app.js`, que necesita DOM. Cuatro tests nuevos cubren: apagado por
+defecto, que la excepción no se persiste, que una excepción lanzada dentro no deja la red
+encendida, y que el interruptor sí persiste. `getStoredNetPref()` es lo que refleja el
+interruptor (la decisión duradera), `isNetEnabled()` lo que consulta el análisis.
+
+Los accesos a `localStorage` van con `try/catch`: en modo privado pueden lanzar, y ante la
+duda lo correcto es **no** salir a la red.

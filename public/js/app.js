@@ -12,6 +12,7 @@ import { checkWebRtcLeak, WEBRTC_FLAG_LABELS } from "./modules/webrtcModule.js";
 import { checkDns, DNS_FLAG_LABELS } from "./modules/dnsModule.js";
 import { checkQr, decodeQrFromBlob, qrSupported, QR_FLAG_LABELS } from "./modules/qrModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
+import { isNetEnabled, setNetPref, getStoredNetPref, withNetOnce } from "./netPref.js";
 import {
   SAMPLES,
   sampleSafePdfFile,
@@ -33,8 +34,6 @@ const ALL_FLAG_LABELS = {
   ...DNS_FLAG_LABELS,
   ...QR_FLAG_LABELS,
 };
-const NET_PREF_KEY = "cerberus_net_enabled";
-
 // Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
 // saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
 const APP_VERSION = "1.0.0";
@@ -102,13 +101,13 @@ function initNetToggle() {
   const badge = document.getElementById("netBadge");
   const netState = document.getElementById("netState");
 
-  const saved = localStorage.getItem(NET_PREF_KEY) === "1";
+  const saved = getStoredNetPref();
   toggles.forEach((t) => (t.checked = saved));
   updateNetUi(saved);
 
   toggles.forEach((toggle) =>
     toggle.addEventListener("change", () => {
-      localStorage.setItem(NET_PREF_KEY, toggle.checked ? "1" : "0");
+      setNetPref(toggle.checked);
       toggles.forEach((t) => (t.checked = toggle.checked));
       updateNetUi(toggle.checked);
     })
@@ -124,10 +123,6 @@ function initNetToggle() {
     badge.classList.toggle("online", enabled);
     netState.textContent = label;
   }
-}
-
-function isNetEnabled() {
-  return localStorage.getItem(NET_PREF_KEY) === "1";
 }
 
 // ---- URL module ----
@@ -209,22 +204,16 @@ function offlineOnlyNotice() {
   return `
     <div class="netwarn offline-notice">
       <span>Análisis <strong>solo offline</strong>: no se ha comprobado contra listas de amenazas, así que
-      este resultado no descarta que el enlace esté reportado como phishing.</span>
-      <button type="button" class="sample-btn enable-net-btn">Activar comprobación en red y repetir</button>
+      este resultado no descarta que el enlace esté reportado como phishing. Para dejarlo activado
+      siempre está el interruptor de arriba.</span>
+      <button type="button" class="sample-btn enable-net-btn">Comprobar también en red, solo esta vez</button>
     </div>`;
 }
 
-// Conecta los botones "Activar y repetir" que aparecen dentro de un resultado.
+// Conecta los botones "solo esta vez" que aparecen dentro de un resultado.
 function wireEnableNetButtons(container, rerun) {
   container.querySelectorAll(".enable-net-btn").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      localStorage.setItem(NET_PREF_KEY, "1");
-      document.querySelectorAll(".net-toggle").forEach((t) => {
-        t.checked = true;
-        t.dispatchEvent(new Event("change"));
-      });
-      rerun();
-    })
+    btn.addEventListener("click", () => withNetOnce(rerun))
   );
 }
 

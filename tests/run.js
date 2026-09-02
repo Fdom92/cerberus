@@ -12,6 +12,7 @@ import { scanSecrets } from "../public/js/modules/secretsModule.js";
 import { parseExif } from "../public/js/modules/exifModule.js";
 import { checkApp } from "../public/js/modules/appsModule.js";
 import { classifyQrPayload, checkQr } from "../public/js/modules/qrModule.js";
+import { isNetEnabled, setNetPref, getStoredNetPref, withNetOnce, NET_PREF_KEY } from "../public/js/netPref.js";
 import { listZipEntries, extractZipEntry } from "../public/js/zipReader.js";
 import { parseManifest } from "../public/js/axmlParser.js";
 import { parseBinaryPlist } from "../public/js/plistParser.js";
@@ -602,6 +603,42 @@ test("urlModule: checkUrl acepta persist:false y no escribe en el historial", as
   const antes = (await listResults()).length;
   await checkUrl("https://example.com", { networkEnabled: false, persist: false });
   assertEqual((await listResults()).length, antes);
+});
+
+// ---- netPref: el ajuste de red es de privacidad ----
+// El botón "comprobar también en red" que sale dentro de un resultado dejaba la preferencia
+// encendida de forma permanente en las cuatro herramientas. El usuario había pedido repetir
+// una comprobación, no cambiar un ajuste. Que no vuelva a pasar.
+test("netPref: por defecto está apagado", () => {
+  localStorage.removeItem(NET_PREF_KEY);
+  assertEqual(isNetEnabled(), false);
+  assertEqual(getStoredNetPref(), false);
+});
+
+test("netPref: la excepción de un solo uso NO se guarda", async () => {
+  localStorage.removeItem(NET_PREF_KEY);
+  let dentro = null;
+  await withNetOnce(() => { dentro = isNetEnabled(); });
+  assertEqual(dentro, true, "no se aplicó durante la comprobación");
+  assertEqual(isNetEnabled(), false, "quedó encendido después");
+  assertEqual(localStorage.getItem(NET_PREF_KEY), null, "escribió la preferencia");
+});
+
+test("netPref: una excepción dentro no deja la red encendida", async () => {
+  localStorage.removeItem(NET_PREF_KEY);
+  try {
+    await withNetOnce(() => { throw new Error("fallo"); });
+  } catch { /* esperado */ }
+  assertEqual(isNetEnabled(), false);
+});
+
+test("netPref: el interruptor sí es una decisión duradera", () => {
+  setNetPref(true);
+  assertEqual(isNetEnabled(), true);
+  assertEqual(getStoredNetPref(), true);
+  setNetPref(false);
+  assertEqual(isNetEnabled(), false);
+  localStorage.removeItem(NET_PREF_KEY);
 });
 
 // ---- db.js (IndexedDB / localStorage fallback) ----
