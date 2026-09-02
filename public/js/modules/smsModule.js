@@ -87,7 +87,7 @@ function mentionedBrandDomains(text) {
     .flatMap(([, domains]) => domains);
 }
 
-export async function checkSms(rawText, { networkEnabled = false } = {}) {
+export async function checkSms(rawText, { networkEnabled = false, persist = true } = {}) {
   const flags = [];
   const urls = extractUrls(rawText);
 
@@ -156,7 +156,7 @@ export async function checkSms(rawText, { networkEnabled = false } = {}) {
     timestamp: Date.now(),
   };
 
-  await saveResult({
+  if (persist) await saveResult({
     type: "sms",
     input: rawText.length > 80 ? rawText.slice(0, 80) + "…" : rawText,
     verdict,

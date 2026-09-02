@@ -8,6 +8,7 @@ import { checkFile } from "../public/js/modules/fileModule.js";
 import { scanSecrets } from "../public/js/modules/secretsModule.js";
 import { checkApp } from "../public/js/modules/appsModule.js";
 import { decodeAll } from "../public/js/modules/decodeModule.js";
+import { checkQr } from "../public/js/modules/qrModule.js";
 
 const rows = [];
 function record(module, input, verdict, flags, note = "") {
@@ -69,6 +70,24 @@ const BENIGN_URLS = [
   "https://es.stackoverflow.com/questions/12345/como-hacer-x",
   "https://www.renfe.com/es/es",
   "https://www.idealista.com/inmueble/12345678/",
+];
+
+// ---------------- QR legítimos ----------------
+// Los QR cotidianos: la wifi del bar, la carta, un pago con Bizum, un contacto de feria,
+// el alta de 2FA que TÚ acabas de pedir. Marcar estos de peligrosos sería enseñar a la gente
+// a ignorar el aviso justo cuando importa.
+const BENIGN_QRS = [
+  "https://www.google.com/maps/place/Restaurante",
+  "https://es.wikipedia.org/wiki/Codigo_QR",
+  "WIFI:T:WPA;S:MOVISTAR_4A2F;P:Kj8s2Lp9q;;",
+  "WIFI:T:WPA2;S:Bar Manolo;P:cerveza2026;;",
+  "tel:+34911234567",
+  "tel:+34600123456",
+  "mailto:info@ejemplo.es",
+  "BEGIN:VCARD\nVERSION:3.0\nN:Perez;Ana\nTEL:+34600111222\nEND:VCARD",
+  "Mesa 12 — pide desde aqui",
+  "https://www.renfe.com/es/es",
+  "https://sede.seg-social.gob.es/wps/portal/sede",
 ];
 
 // ---------------- SMS legítimos ----------------
@@ -204,6 +223,16 @@ async function run() {
       if (r.verdict !== "safe") record("URL", u, r.verdict, r.flags);
     } catch (e) {
       record("URL", u, "ERROR", [], e.message);
+    }
+  }
+
+  // QR
+  for (const q of BENIGN_QRS) {
+    try {
+      const r = await checkQr(q, { networkEnabled: false, persist: false });
+      if (r.verdict !== "safe") record("QR", q.slice(0, 50), r.verdict, [...r.flags, ...(r.nested?.flags || [])]);
+    } catch (e) {
+      record("QR", q.slice(0, 50), "ERROR", [], e.message);
     }
   }
 

@@ -349,6 +349,19 @@ button.danger-btn {
 }
 .chain .arrow { color: var(--text-dim); padding: 0 4px; }
 
+/* El contenido literal del QR es lo primero que el usuario necesita ver: es exactamente lo
+   que su móvil habría hecho sin preguntar. Se muestra tal cual, escapado y sin acortar. */
+.qr-payload {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
 .flags {
   list-style: none;
   padding: 0;

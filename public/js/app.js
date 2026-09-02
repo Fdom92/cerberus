@@ -10,6 +10,7 @@ import { scanSecrets } from "./modules/secretsModule.js";
 import { checkApp } from "./modules/appsModule.js";
 import { checkWebRtcLeak, WEBRTC_FLAG_LABELS } from "./modules/webrtcModule.js";
 import { checkDns, DNS_FLAG_LABELS } from "./modules/dnsModule.js";
+import { checkQr, decodeQrFromBlob, qrSupported, QR_FLAG_LABELS } from "./modules/qrModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
 import {
   SAMPLES,
@@ -30,6 +31,7 @@ const ALL_FLAG_LABELS = {
   ...PASSWORD_FLAG_LABELS,
   ...WEBRTC_FLAG_LABELS,
   ...DNS_FLAG_LABELS,
+  ...QR_FLAG_LABELS,
 };
 const NET_PREF_KEY = "cerberus_net_enabled";
 
@@ -47,6 +49,12 @@ function flagsHtml(flags, emptyText = "Sin señales de riesgo") {
 function wireSample(buttonId, inputEl, value, formEl) {
   const btn = document.getElementById(buttonId);
   if (!btn) return;
+  // Sin esto, una muestra que no exista escribía la cadena "undefined" en el campo y la app
+  // la analizaba tan tranquila como si fuera la entrada del usuario.
+  if (value === undefined || value === null) {
+    btn.hidden = true;
+    return;
+  }
   btn.addEventListener("click", () => {
     inputEl.value = value;
     if (formEl) formEl.requestSubmit();
@@ -151,7 +159,16 @@ function renderUrlResult(el, r) {
     : "";
   const meta = [];
   if (r.httpCode !== null && r.httpCode !== undefined) meta.push(`HTTP ${r.httpCode}`);
-  if (r.ageDays !== null && r.ageDays !== undefined) meta.push(`dominio con ${r.ageDays} días`);
+  // De dónde sale el número importa: RDAP da la fecha de registro real; para los TLD que no
+  // publican RDAP (.es, .eu) se usa el primer certificado emitido, que acota la edad por
+  // arriba pero no es la fecha de alta. Presentarlos como lo mismo sería mentir.
+  if (r.ageDays !== null && r.ageDays !== undefined) {
+    meta.push(
+      r.ageSource === "ct"
+        ? `dominio visto por primera vez hace ${r.ageDays} días (primer certificado)`
+        : `dominio registrado hace ${r.ageDays} días`
+    );
+  }
 
   el.innerHTML = `
     <span class="verdict ${r.verdict}">${r.verdict}</span>
@@ -540,6 +557,115 @@ function initSecretsTool() {
   wireSample("sampleSecretsMalicious", input, SAMPLES.secretsDirty, form);
 }
 
+// ---- QR tool ----
+// Un QR es el único caso en el que no puedes leer a dónde vas antes de ir: por eso funciona
+// tan bien la pegatina encima del código del parquímetro o de la carta del restaurante.
+// La decodificación es del propio navegador (BarcodeDetector); la imagen no sale del móvil.
+function initQrTool() {
+  const dropZone = document.getElementById("qrDropZone");
+  const fileInput = document.getElementById("qrInput");
+  const resultEl = document.getElementById("qrResult");
+  const form = document.getElementById("qrForm");
+  const textInput = document.getElementById("qrText");
+  const soporteAviso = document.getElementById("qrSupportNote");
+
+  // Safari no trae BarcodeDetector. En vez de dejar un botón que no hace nada, se dice y se
+  // señala la alternativa: la cámara del propio móvil ya lee el QR sin abrirlo.
+  if (!qrSupported()) {
+    soporteAviso.hidden = false;
+    dropZone.hidden = true;
+  }
+
+  const analizar = async (texto) => {
+    resultEl.hidden = false;
+    resultEl.innerHTML = '<p class="hint">Analizando…</p>';
+    try {
+      const r = await checkQr(texto, { networkEnabled: isNetEnabled() });
+      renderQrResult(resultEl, r);
+      wireEnableNetButtons(resultEl, () => analizar(texto));
+    } catch (err) {
+      resultEl.innerHTML = `<p class="hint">No se pudo analizar: ${escapeHtml(err.message || String(err))}</p>`;
+    }
+  };
+
+  const handle = async (file) => {
+    if (!file) return;
+    resultEl.hidden = false;
+    resultEl.innerHTML = '<p class="hint">Leyendo el código…</p>';
+    try {
+      const texto = await decodeQrFromBlob(file);
+      textInput.value = texto;
+      await analizar(texto);
+    } catch (err) {
+      const motivo =
+        err.message === "sin_codigo"
+          ? "No se ha encontrado ningún código QR en la imagen. Prueba con una foto más nítida o más cerca."
+          : err.message === "sin_soporte"
+            ? "Este navegador no sabe leer códigos QR. Usa la cámara del móvil y pega aquí abajo el texto que te muestre."
+            : `No se pudo leer la imagen: ${escapeHtml(err.message || String(err))}`;
+      resultEl.innerHTML = `<p class="hint">${motivo}</p>`;
+    }
+  };
+
+  fileInput.addEventListener("change", () => handle(fileInput.files[0]));
+  wireDropZone(dropZone, handle);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = textInput.value.trim();
+    if (t) analizar(t);
+  });
+
+  wireSample("sampleQrSafe", textInput, SAMPLES.qrSafe, form);
+  wireSample("sampleQrMalicious", textInput, SAMPLES.qrMalicious, form);
+}
+
+const QR_KIND_LABELS = {
+  url: "Enlace web",
+  otpauth: "Alta de verificación en dos pasos",
+  wifi: "Conexión a una red wifi",
+  sms: "SMS ya redactado",
+  tel: "Llamada telefónica",
+  pago: "Solicitud de pago",
+  deeplink: "Apertura de una app",
+  contacto: "Contacto para la agenda",
+  mailto: "Correo ya redactado",
+  javascript: "Código ejecutable",
+  data: "Contenido incrustado",
+  texto: "Texto",
+};
+
+function renderQrResult(el, r) {
+  const anidado = r.nested;
+  const flags = [...r.flags, ...(anidado?.flags || [])];
+  const meta = [];
+  if (anidado?.ageDays !== null && anidado?.ageDays !== undefined) {
+    meta.push(
+      anidado.ageSource === "ct"
+        ? `dominio visto por primera vez hace ${anidado.ageDays} días (primer certificado)`
+        : `dominio registrado hace ${anidado.ageDays} días`
+    );
+  }
+
+  el.innerHTML = `
+    <span class="verdict ${r.verdict}">${r.verdict}</span>
+    <div class="score">Riesgo: ${r.riskScore} / 100</div>
+    <div class="chain"><strong>${escapeHtml(QR_KIND_LABELS[r.kind] || r.kind)}</strong></div>
+    <div class="qr-payload">${escapeHtml(anidado?.finalUrl || r.detalle || r.input)}</div>
+    ${
+      anidado?.finalUrl && anidado.finalUrl !== anidado.input
+        ? `<div class="chain">${escapeHtml(anidado.input)}<span class="arrow">→</span>${escapeHtml(anidado.finalUrl)}</div>`
+        : ""
+    }
+    <ul class="flags">${flagsHtml(flags, "Sin señales de riesgo en el contenido del código")}</ul>
+    ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
+    ${reputationNote(anidado?.reputation)}
+    ${previewNote(anidado?.previewUrl)}
+    ${/* Un QR de wifi o de teléfono no tiene dominio que contrastar: ofrecer ahí "activar
+          comprobación en red" es ruido, y el texto hablaría de "el enlace" que no existe. */""}
+    ${r.kind === "url" ? offlineOnlyNotice() : ""}
+  `;
+}
+
 // ---- EXIF tool ----
 function initExifTool() {
   const dropZone = document.getElementById("exifDropZone");
@@ -718,6 +844,7 @@ initJwtTool();
 initPasswordTool();
 initDecodeTool();
 initSecretsTool();
+initQrTool();
 initExifTool();
 initAppsTool();
 initWebrtcTool();

@@ -1,6 +1,6 @@
 # Cerberus
 
-A local-first security command center — a Progressive Web App that runs in your browser with no backend, no account and no build step. Twelve tools for the security decisions people actually face day to day: is this link safe, is this email spoofed, does this app want permissions it shouldn't, is my VPN actually hiding my IP.
+A local-first security command center — a Progressive Web App that runs in your browser with no backend, no account and no build step. Thirteen tools for the security decisions people actually face day to day: is this link safe, where does this QR code actually go, is this email spoofed, does this app want permissions it shouldn't, is my VPN actually hiding my IP.
 
 **Try it:** **[fdom92.github.io/cerberus](https://fdom92.github.io/cerberus/)** — works in any browser, and installs to your home screen as an offline app (Add to Home Screen).
 
@@ -8,13 +8,14 @@ A local-first security command center — a Progressive Web App that runs in you
 
 Most "security checker" tools are either a paid SaaS dashboard or a sketchy website that wants you to paste your password into a form. Cerberus is neither.
 
-Six of the twelve tools never touch the network at all. Four more — URLs, SMS, Mail and Password — do their analysis offline and only reach out if you ask them to (one shared toggle for resolving links and checking them against threat lists, a button for the breached-password check). Only DNS/SPF and the WebRTC leak test are inherently network-bound, since there is nothing to look up otherwise. Every one of those says which service it contacts *before* it contacts it, and nothing sensitive — passwords, JWTs, scanned secrets, WebRTC results — is ever written to storage.
+Six of the thirteen tools never touch the network at all. Five more — URLs, QR, SMS, Mail and Password — do their analysis offline and only reach out if you ask them to (one shared toggle for resolving links and checking them against threat lists, a button for the breached-password check). Only DNS/SPF and the WebRTC leak test are inherently network-bound, since there is nothing to look up otherwise. Every one of those says which service it contacts *before* it contacts it, and nothing sensitive — passwords, JWTs, scanned secrets, WebRTC results — is ever written to storage.
 
 ## Tools
 
 | Tool | What it does | Network |
 |---|---|---|
-| **URLs** | Typosquatting, punycode/homograph, brand-as-subdomain and brand-in-hostname spoofing, IP-literal hosts, `@` tricks; optionally resolves redirects, checks domain age (RDAP) and looks the domain up against Cloudflare's phishing/malware lists | Offline by default, opt-in |
+| **URLs** | Typosquatting, punycode/homograph, brand-as-subdomain and brand-in-hostname spoofing, IP-literal hosts, `@` tricks; optionally resolves the real destination behind a shortener, dates the domain (RDAP, falling back to Certificate Transparency for TLDs like `.es` that publish no RDAP) and looks it up against Cloudflare's phishing/malware lists | Offline by default, opt-in |
+| **QR** | Decodes a photographed QR with the browser's own `BarcodeDetector` — no library, the image never leaves the device — and shows exactly what it contains before the phone acts on it. Classifies the payload (link, wifi, `otpauth:` 2FA enrolment, prefilled SMS, premium-rate number, payment request, `javascript:`) and hands any embedded link to the URL analysis | Offline, opt-in for the link |
 | **Mail** | SPF/DKIM/DMARC parsing, From/Return-Path/Reply-To mismatches, brand impersonation in the display name and Subject, analysis of links in the body; optional threat-list lookup | Offline, opt-in threat lookup |
 | **SMS** | Smishing heuristics — urgency language, credential requests, brand/domain mismatch, callback-number scams, embedded shortened or suspicious links; optional threat-list lookup on the linked domains | Offline, opt-in threat lookup |
 | **DNS / SPF** | Looks up a domain's MX, SPF and DMARC records to see whether it's protected against being spoofed | Network (Cloudflare DoH) |
@@ -45,7 +46,7 @@ public/
     axmlParser.js          Android Binary XML parser (AndroidManifest.xml)
     plistParser.js          binary + XML plist parser (iOS Info.plist)
     sampleData.js            in-browser generators for the "try it" buttons
-    modules/                one file per tool (checkUrl, checkMail, checkApp, ...)
+    modules/                one file per tool (checkUrl, checkQr, checkMail, checkApp, ...)
   manifest.webmanifest, sw.js, icons/    PWA install + offline cache
 ```
 
@@ -63,7 +64,7 @@ Open `http://localhost:8080`. Every tool works offline from there; the URL, SMS,
 
 ## Testing
 
-`tests/` is a zero-dependency regression suite: `tests/run.js` imports the real modules from `public/js/` and exercises them against hand-built synthetic fixtures (a JPEG with EXIF/GPS, a ZIP with stored and deflated entries, an AndroidManifest.xml, a binary plist — all constructed byte-by-byte in `tests/fixtures.js`, not mocked).
+`tests/` is a zero-dependency regression suite: `tests/run.js` (69 tests) imports the real modules from `public/js/` and exercises them against hand-built synthetic fixtures (a JPEG with EXIF/GPS, a ZIP with stored and deflated entries, an AndroidManifest.xml, a binary plist — all constructed byte-by-byte in `tests/fixtures.js`, not mocked).
 
 ```bash
 python3 -m http.server 8080

@@ -8,6 +8,10 @@ function u32(n) {
 // ---- text samples ----
 export const SAMPLES = {
   urlSafe: "https://github.com/anthropics",
+  // Contenido de un QR tal cual sale del lector: el "malicioso" imita la pegatina que se
+  // pega encima del código real de un parquímetro para cobrar una multa que no existe.
+  qrSafe: "WIFI:T:WPA;S:MOVISTAR_4A2F;P:Kj8s2Lp9q;;",
+  qrMalicious: "https://pago-multa-dgt.top/abonar?exp=4471",
   urlMalicious: "http://192.168.1.1@goog1e-verify.com/reset",
 
   mailSafe:

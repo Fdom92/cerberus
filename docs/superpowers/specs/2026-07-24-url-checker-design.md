@@ -463,3 +463,106 @@ Verdict: `0-29` safe · `30-69` suspicious · `70+` dangerous
 - Resolución de destino final vía proxy CORS público (allorigins) — se acepta la limitación de no tener timeline hop-a-hop, solo origen→destino final
 - Historial vía IndexedDB con fallback localStorage, sin sync remoto
 - Stack: HTML/CSS/JS vanilla, sin build step, sin framework, Service Worker para offline
+
+---
+
+## Revisión general "no descartes nada" (2026-09-02)
+
+Después de haberme equivocado al declarar imposible la resolución de acortadores sin backend
+(la conclusión venía de pruebas con `curl` que no mandaban cabecera `Origin`, que es lo que
+varios proxies CORS exigen), se repasó **cada limitación asumida**, probándola en lugar de
+razonarla. Resultado: dos de ellas eran falsas, y una señal que ya existía llevaba tiempo rota.
+
+### 1. `domain_age` no se aplicaba nunca (bug, no limitación)
+
+`domainAge()` consultaba RDAP con el **hostname completo**. RDAP solo entiende el dominio
+registrable:
+
+```
+rdap.org/domain/google.com       → 200, registro 1997-09-15
+rdap.org/domain/www.google.com   → 404
+```
+
+Es decir: cualquier URL con subdominio — o sea casi todas, empezando por cualquier `www.` —
+caía en `domain_age_unknown`, y `domain_new` (40 puntos, la señal más fuerte de la app después
+de las listas de amenazas) **no llegaba a dispararse jamás**. Un dominio de phishing con
+subdominio pasaba por "edad desconocida" en vez de "registrado hace 6 días".
+
+Arreglado usando `registrableDomain()`, que ya existía en el mismo fichero.
+
+### 2. Los TLD que no publican RDAP: Certificate Transparency
+
+El bootstrap oficial de IANA (`data.iana.org/rdap/dns.json`) confirma que **`.es` y `.eu` no
+tienen servidor RDAP**. Para un usuario español eso es la mitad de los dominios que le llegan.
+
+`crt.sh` sí manda `Access-Control-Allow-Origin: *`, y el primer certificado emitido para un
+dominio acota su edad por arriba. No es la fecha de registro y no se presenta como tal: la UI
+dice "visto por primera vez hace N días (primer certificado)" cuando el dato viene de ahí.
+
+Se distingue `tld_sin_rdap` (el registro no publica los datos) de `sin_datos` (la consulta
+falló) mirando `res.redirected`: rdap.org redirige al servidor del registro cuando existe, así
+que un 404 **sin** redirección significa que ese TLD no está en RDAP.
+
+Coste medido y mitigado: `crt.sh` no permite limitar resultados en el servidor y un dominio
+veterano devuelve megabytes (`bancosantander.es` = 2,2 MB, 14 s). Se lee en streaming con un
+tope de 250 KB, y **superar el tope es en sí la respuesta**: tantísimos certificados implican
+historial largo, o sea que el dominio no es reciente. Además solo se consulta si RDAP no dio
+nada y el dominio no está en la lista de conocidos.
+
+`crt.sh` throttlea con uso repetido y entonces responde sin cabeceras CORS. Se trata como
+best-effort: si falla no se emite ninguna señal de sospecha.
+
+### 3. Escalón intermedio de antigüedad
+
+El caso real que reportó el usuario (`skypolegdansk.mom`) tenía **57 días**: pasaba el umbral
+de 30 y no disparaba nada. Se añade `domain_recent` (< 180 días, 20 puntos). 20 puntos **no**
+alcanzan solos el umbral de sospecha (30) — un negocio legítimo recién montado también tiene
+un dominio reciente. Solo pesa acompañado de otra señal, que es justo lo que se busca.
+
+### 4. Dos listas de dominios desincronizadas
+
+`known-domains.json` (60 entradas) y `BRAND_DOMAINS` (59) eran fuentes separadas. Faltaban en
+la comparación de typosquatting **todos los bancos españoles**, `bizum.es`, `renfe.es`,
+`movistar.es` y 34 dominios más. Es el mismo fallo que ya se documentó entre `smsModule` y
+`mailModule`. Se fusionan en `getKnownDomains()` para que no vuelvan a separarse.
+
+Verificado: `bbvaa.es` / `renfee.es` / `bizumm.es` → `typosquat`; los legítimos, limpios.
+
+### 5. Herramienta QR (capacidad que ni se había considerado)
+
+`BarcodeDetector` es una **API del propio navegador** — soporta `qr_code` sin ninguna
+librería y sin que la imagen salga del dispositivo. Se había descartado el QR asumiendo que
+haría falta una dependencia; nunca se comprobó.
+
+Un QR es el único enlace que el usuario no puede leer antes de abrirlo, que es exactamente por
+lo que funciona pegar una pegatina encima del código de un parquímetro o de una multa.
+
+Se clasifica el contenido antes de que el móvil actúe sobre él, y se delega en las
+herramientas que ya existen (`checkUrl` completo si hay enlace, `checkSms` si es texto).
+Señales propias del formato, que no existen en un enlace normal:
+
+| Carga | Por qué importa |
+|---|---|
+| `otpauth://` | Enlaza tu 2FA con una cuenta que controla otro. Solo es legítimo si lo acabas de pedir tú |
+| `javascript:` / `data:` | No es un enlace, es ejecución / contenido incrustado sin dominio que delate nada |
+| `WIFI:` sin contraseña | Red abierta: quien la monta ve el tráfico no cifrado |
+| `SMSTO:` con texto | SMS ya redactado: así se dan de alta suscripciones de pago |
+| `tel:`/`SMSTO:` a 80x/90x | Tarificación especial, la paga quien llama |
+| `bitcoin:` y similares | Solicitud de pago con importe y destinatario ya fijados |
+
+`Safari no trae BarcodeDetector`. En vez de dejar un botón muerto, se detecta y se dice, y se
+ofrece pegar el texto que la cámara del móvil ya muestra sin abrir el enlace.
+
+Verificado extremo a extremo decodificando PNG reales, no solo la clasificación.
+
+### Lo que se volvió a probar y sigue sin ser posible
+
+- **Cadena salto a salto**: `unshorten.me` y `api.redirect-checker.net` siguen sin mandar
+  cabeceras CORS, ahora comprobado **con** `Origin`. Sigue necesitando backend.
+- **Reputación de hash de archivo**: `mb-api.abuse.ch` responde `401 Unauthorized`, ya pide
+  clave. VirusTotal siempre la ha pedido.
+
+### Estado de las suites tras los cambios
+
+69/69 tests · 0 falsos positivos (incluidos 11 QR legítimos nuevos) · 3/27 evasiones ·
+2/30 campañas · auditoría hostil sin inyección (incluidos payloads XSS por la ruta nueva de QR)

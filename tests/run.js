@@ -11,6 +11,7 @@ import { decodeAll } from "../public/js/modules/decodeModule.js";
 import { scanSecrets } from "../public/js/modules/secretsModule.js";
 import { parseExif } from "../public/js/modules/exifModule.js";
 import { checkApp } from "../public/js/modules/appsModule.js";
+import { classifyQrPayload, checkQr } from "../public/js/modules/qrModule.js";
 import { listZipEntries, extractZipEntry } from "../public/js/zipReader.js";
 import { parseManifest } from "../public/js/axmlParser.js";
 import { parseBinaryPlist } from "../public/js/plistParser.js";
@@ -534,6 +535,73 @@ test("appsModule: non-zip binary falls back to strings-only scan", async () => {
   const r = await checkApp(new File([bytes], "tool.exe"));
   assertEqual(r.isZip, false);
   assert(r.secretFindings.some((f) => f.name === "AWS Access Key ID"));
+});
+
+
+// ---- qrModule ----
+// Un QR no se puede leer a ojo, así que lo que importa es que el contenido salga clasificado
+// tal cual es ANTES de que el móvil actúe sobre él.
+test("qrModule: un QR con URL hereda todo el análisis de enlaces", async () => {
+  const r = await checkQr("https://pago-multa-dgt.top/abonar", { networkEnabled: false, persist: false });
+  assertEqual(r.kind, "url");
+  assert(r.nested.flags.includes("brand_in_hostname"));
+  assertEqual(r.verdict, "suspicious");
+});
+
+test("qrModule: URL sin esquema (como la escriben casi todos los QR) se reconoce igual", () => {
+  const c = classifyQrPayload("bbva-clientes.top/acceso");
+  assertEqual(c.kind, "url");
+  assertEqual(c.urlNormalizada, "https://bbva-clientes.top/acceso");
+});
+
+test("qrModule: otpauth se marca — es el QR que enlaza tu 2FA con otra persona", () => {
+  const c = classifyQrPayload("otpauth://totp/BBVA:fer?secret=JBSWY3DPEHPK3PXP&issuer=BBVA");
+  assertEqual(c.kind, "otpauth");
+  assert(c.flags.includes("qr_otpauth"));
+});
+
+test("qrModule: wifi abierta se distingue de wifi con contraseña", () => {
+  assert(classifyQrPayload("WIFI:T:nopass;S:Free_WiFi;;").flags.includes("qr_wifi_open"));
+  const conClave = classifyQrPayload("WIFI:T:WPA;S:MiCasa;P:secreta123;;");
+  assert(!conClave.flags.includes("qr_wifi_open"));
+  assertEqual(conClave.detalle, "MiCasa");
+});
+
+test("qrModule: número de tarificación especial y SMS preescrito se detectan", () => {
+  assert(classifyQrPayload("tel:+34905123456").flags.includes("qr_premium_number"));
+  const sms = classifyQrPayload("SMSTO:80345:ALTA");
+  assert(sms.flags.includes("qr_premium_number"));
+  assert(sms.flags.includes("qr_sms_preescrito"));
+});
+
+test("qrModule: javascript: y data: no son enlaces, son ejecución", () => {
+  assert(classifyQrPayload("javascript:fetch('//evil.tld')").flags.includes("qr_javascript"));
+  assert(classifyQrPayload("data:text/html;base64,PHNjcmlwdD4=").flags.includes("qr_data_uri"));
+});
+
+test("qrModule: un QR corriente no dispara nada", async () => {
+  const menu = await checkQr("https://www.google.com/maps", { networkEnabled: false, persist: false });
+  assertEqual(menu.verdict, "safe");
+  const tel = classifyQrPayload("tel:+34911234567");
+  assertEqual(tel.flags.length, 0);
+  assertEqual(classifyQrPayload("Mesa 4 - pide por aqui").kind, "texto");
+});
+
+// ---- edad de dominio ----
+// La consulta RDAP iba con el hostname completo, y RDAP solo entiende el dominio registrable:
+// "www.loquesea.com" devolvía 404 y la señal más fuerte que tiene la app no llegaba a
+// aplicarse nunca en ninguna URL con subdominio, o sea en casi ninguna.
+test("urlModule: los dominios de marca entran en la comparación de typosquatting", async () => {
+  const r = await checkUrl("https://bbvaa.es/acceso", { networkEnabled: false, persist: false });
+  assert(r.flags.includes("typosquat"), "typosquat de un banco español no detectado");
+  const legitimo = await checkUrl("https://bbva.es", { networkEnabled: false, persist: false });
+  assertEqual(legitimo.flags.length, 0);
+});
+
+test("urlModule: checkUrl acepta persist:false y no escribe en el historial", async () => {
+  const antes = (await listResults()).length;
+  await checkUrl("https://example.com", { networkEnabled: false, persist: false });
+  assertEqual((await listResults()).length, antes);
 });
 
 // ---- db.js (IndexedDB / localStorage fallback) ----

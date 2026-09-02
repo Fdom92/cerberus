@@ -21,6 +21,10 @@ const FLAG_POINTS = {
   suspicious_tld: 15,
   excess_subdomains: 15,
   domain_new: 40,
+  // Casi todo el phishing se sirve desde dominios de menos de seis meses, pero un negocio
+  // legítimo recién montado también es reciente: 20 puntos NO llegan solos al umbral de
+  // sospecha (30). Solo pesa acompañado de otra señal, que es exactamente lo que se quiere.
+  domain_recent: 20,
   resolve_failed: 0,
   resolve_rate_limited: 0,
   domain_age_unknown: 0,
@@ -41,9 +45,10 @@ const FLAG_LABELS = {
   suspicious_tld: "Dominio de nivel superior muy usado en campañas de phishing (barato, sin verificación)",
   excess_subdomains: "Demasiados guiones o subdominios — patrón típico de phishing",
   domain_new: "Dominio registrado hace menos de 30 días",
+  domain_recent: "Dominio registrado hace menos de 6 meses — no es sospechoso por sí solo, pero casi todas las campañas de phishing usan dominios recientes",
   resolve_rate_limited: "Se ha alcanzado el límite diario de consultas del servicio que resuelve enlaces (25 al día). Vuelve a intentarlo mañana o usa la vista previa del acortador",
   resolve_failed: "No se pudo averiguar el destino final. Es una limitación de esta app (funciona sin servidor propio y depende de proxies públicos poco fiables), no una señal sobre el enlace",
-  domain_age_unknown: "No se pudo determinar la edad del dominio",
+  domain_age_unknown: "No se pudo determinar la edad del dominio. Es una limitación de la consulta, no una señal sobre el enlace",
 };
 
 // TLDs con abuso desproporcionado en campañas de phishing (baratos, registro sin verificación).
@@ -93,14 +98,22 @@ export function shortenerPreviewUrl(rawUrl) {
 const EXECUTABLE_URL_EXT = /\.(exe|scr|pif|bat|cmd|msi|msp|vbs|vbe|wsf|ps1|jar|apk|hta|cpl|lnk|iso|img|dmg)($|[?#])/i;
 
 let knownDomainsCache = null;
+// known-domains.json y BRAND_DOMAINS eran dos listas separadas que se habían desincronizado:
+// bbva.com estaba en una y bbva.es en la otra, y ningún banco español, bizum.es, renfe.es ni
+// movistar.es entraban en la comparación de typosquatting. Se unen aquí para que haya una
+// sola fuente y no vuelvan a separarse. (Mismo fallo que ya se documentó entre smsModule y
+// mailModule; ver docs/superpowers/specs.)
 async function getKnownDomains() {
   if (knownDomainsCache) return knownDomainsCache;
+  let base = [];
   try {
     const res = await fetch(new URL("../../data/known-domains.json", import.meta.url));
-    knownDomainsCache = await res.json();
+    base = await res.json();
   } catch {
-    knownDomainsCache = [];
+    base = [];
   }
+  const marcas = Object.values(BRAND_DOMAINS).flat();
+  knownDomainsCache = [...new Set([...base, ...marcas])];
   return knownDomainsCache;
 }
 
@@ -313,21 +326,104 @@ async function resolveDestination(url) {
   return { finalUrl: null, httpCode: null, rateLimited };
 }
 
-async function domainAge(hostname) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
+// La edad del dominio es una de las señales más fuertes que existen: casi todo el phishing
+// vive en dominios registrados hace poco. Estaba silenciosamente rota — se consultaba RDAP
+// con el hostname COMPLETO, y RDAP solo entiende el dominio registrable: "www.google.com"
+// devolvía 404, así que cualquier URL con subdominio (o sea, casi todas) acababa en
+// "edad desconocida" y la señal no llegaba a aplicarse nunca.
+// Cuando un TLD no está en RDAP no hay nada que consultar: no es un fallo, es que ese
+// registro no publica los datos. Se distingue de un fallo real para no dar una alarma
+// que el usuario no puede resolver.
+async function ageViaRdap(domain) {
+  const res = await fetchWithTimeout(`https://rdap.org/domain/${encodeURIComponent(domain)}`, 9000);
+  // rdap.org redirige al servidor del registro. Un 404 SIN redirección significa que ese TLD
+  // no tiene servidor RDAP (.es y .eu, entre otros); con redirección, que el dominio no existe.
+  if (res.status === 404 && !res.redirected) return { days: null, reason: "tld_sin_rdap" };
+  if (!res.ok) return { days: null, reason: "sin_datos" };
+  const data = await res.json();
+  const registration = (data.events || []).find((e) => e.eventAction === "registration");
+  if (!registration) return { days: null, reason: "sin_datos" };
+  const ts = new Date(registration.eventDate).getTime();
+  if (!Number.isFinite(ts)) return { days: null, reason: "sin_datos" };
+  return { days: Math.round((Date.now() - ts) / 86400000), reason: null, source: "rdap" };
+}
+
+// Para los TLD sin RDAP (.es, .eu) queda Certificate Transparency: el primer certificado
+// emitido para un dominio acota su edad por arriba. No es la fecha de registro, pero para
+// distinguir "de esta semana" de "de hace años" sirve, y es un registro público y auditable.
+//
+// crt.sh no permite limitar resultados en el servidor, y un dominio veterano puede devolver
+// megabytes. Se lee en streaming con un tope: si lo supera, la respuesta MISMA es la señal
+// (tantísimos certificados = historial largo = no es reciente) y se corta la descarga.
+const CRTSH_MAX_BYTES = 250000;
+
+async function ageViaCertLog(domain) {
+  const res = await fetchWithTimeout(
+    `https://crt.sh/?q=${encodeURIComponent(domain)}&output=json`,
+    12000
+  );
+  if (!res.ok || !res.body) return { days: null, reason: "sin_datos" };
+
+  // fetchWithTimeout solo cubre hasta las cabeceras: sin esto, un servidor que empieza a
+  // responder y luego se atasca dejaba la lectura colgada sin límite.
+  const limite = Date.now() + 10000;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let texto = "";
+  let bytes = 0;
+  let truncado = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (Date.now() > limite) {
+      await reader.cancel();
+      return { days: null, reason: "sin_datos" };
+    }
+    bytes += value.byteLength;
+    if (bytes > CRTSH_MAX_BYTES) {
+      truncado = true;
+      await reader.cancel();
+      break;
+    }
+    texto += decoder.decode(value, { stream: true });
+  }
+  if (truncado) return { days: null, reason: "historial_largo" };
+
+  let registros;
   try {
-    const res = await fetch(`https://rdap.org/domain/${hostname}`, { signal: controller.signal });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const registration = (data.events || []).find((e) => e.eventAction === "registration");
-    if (!registration) return null;
-    const days = (Date.now() - new Date(registration.eventDate).getTime()) / 86400000;
-    return Math.round(days);
+    registros = JSON.parse(texto);
   } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+    return { days: null, reason: "sin_datos" };
+  }
+  if (!Array.isArray(registros) || registros.length === 0) {
+    return { days: null, reason: "sin_certificados" };
+  }
+  const fechas = registros.map((r) => r.not_before).filter(Boolean).sort();
+  const ts = new Date(fechas[0]).getTime();
+  if (!Number.isFinite(ts)) return { days: null, reason: "sin_datos" };
+  return { days: Math.round((Date.now() - ts) / 86400000), reason: null, source: "ct" };
+}
+
+// Devuelve { days, source, reason }. `days` null NO significa sospecha: significa que no se
+// sabe, y así se dice. Un dominio conocido no se consulta — es gasto y latencia para
+// confirmar lo que ya sabemos, y en crt.sh son megabytes.
+async function domainAge(hostname, knownDomains) {
+  const domain = registrableDomain(hostname);
+  if (Array.isArray(knownDomains) && knownDomains.includes(domain)) {
+    return { days: null, source: null, reason: "dominio_conocido" };
+  }
+  try {
+    const rdap = await ageViaRdap(domain);
+    if (rdap.days !== null) return { ...rdap, domain };
+    if (rdap.reason !== "tld_sin_rdap") return { ...rdap, source: null, domain };
+  } catch {
+    /* se intenta el registro de certificados igualmente */
+  }
+  try {
+    const ct = await ageViaCertLog(domain);
+    return { ...ct, source: ct.source || null, domain };
+  } catch {
+    return { days: null, source: null, reason: "sin_datos", domain };
   }
 }
 
@@ -337,7 +433,7 @@ function scoreFlags(flags) {
   return { riskScore, verdict };
 }
 
-export async function checkUrl(rawInput, { networkEnabled }) {
+export async function checkUrl(rawInput, { networkEnabled, persist = true } = {}) {
   const url = parseUrl(rawInput);
   const knownDomains = await getKnownDomains();
   const flags = offlineHeuristics(url, knownDomains);
@@ -345,6 +441,8 @@ export async function checkUrl(rawInput, { networkEnabled }) {
   let finalUrl = null;
   let httpCode = null;
   let ageDays = null;
+  let ageSource = null;
+  let ageReason = null;
   let reputation = null;
   let rateLimited = false;
 
@@ -372,9 +470,18 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     }
 
     const targetHost = (finalUrl ? (() => { try { return new URL(finalUrl).hostname; } catch { return url.hostname; } })() : url.hostname);
-    ageDays = await domainAge(targetHost);
-    if (ageDays === null) flags.push("domain_age_unknown");
-    else if (ageDays < 30) flags.push("domain_new");
+    const edad = await domainAge(targetHost, knownDomains);
+    ageDays = edad.days;
+    ageSource = edad.source;
+    ageReason = edad.reason;
+    if (ageDays !== null) {
+      if (ageDays < 30) flags.push("domain_new");
+      else if (ageDays < 180) flags.push("domain_recent");
+    } else if (edad.reason !== "dominio_conocido" && edad.reason !== "historial_largo") {
+      // Un dominio conocido o con historial largo de certificados no es una edad "desconocida":
+      // en ambos casos se sabe que NO es reciente, que es justo lo que se estaba preguntando.
+      flags.push("domain_age_unknown");
+    }
 
     // Se consulta el destino final: de nada sirve mirar la reputación del acortador.
     reputation = (await checkDomainReputation(targetHost)).status;
@@ -389,6 +496,8 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     finalUrl,
     httpCode,
     ageDays,
+    ageSource,
+    ageReason,
     reputation,
     rateLimited,
     previewUrl: shortenerPreviewUrl(url.href),
@@ -398,7 +507,9 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     timestamp: Date.now(),
   };
 
-  await saveResult({
+  // El módulo de QR reutiliza este análisis; sin persist=false cada escaneo dejaba dos
+  // entradas en el historial, la del QR y la de la URL que lleva dentro.
+  if (persist) await saveResult({
     type: "url",
     input: url.href,
     verdict,
