@@ -11,10 +11,25 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleString();
 }
 
-const TYPE_ICONS = { url: "🔗", file: "📄", mail: "✉️", sms: "💬", app: "📱", dns: "🌐" };
+// Mismo conjunto de iconos que el resto de la app (sprite SVG de index.html): los emojis que
+// había aquí los dibuja cada sistema a su manera y desentonaban con las tarjetas.
+const TYPE_ICONS = {
+  url: "i-url", file: "i-file", mail: "i-mail", sms: "i-sms",
+  app: "i-apps", apps: "i-apps", dns: "i-dns", qr: "i-qr",
+};
 function typeIcon(type) {
-  return TYPE_ICONS[type] || "•";
+  const id = TYPE_ICONS[type];
+  if (!id) return "";
+  return `<svg class="h-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
 }
+
+// El veredicto se guardaba en inglés porque es la clave interna; en pantalla no pinta nada.
+const VERDICT_LABELS = {
+  dangerous: "peligroso",
+  suspicious: "sospechoso",
+  safe: "sin señales",
+  unknown: "sin datos",
+};
 
 export async function renderHistory(listEl) {
   const items = await listResults();
@@ -31,11 +46,11 @@ export async function renderHistory(listEl) {
     el.innerHTML = `
       <div class="h-top">
         <div>
-          <span class="verdict ${item.verdict}">${item.verdict}</span>
+          <span class="verdict ${item.verdict}">${VERDICT_LABELS[item.verdict] || item.verdict}</span>
         </div>
         <button class="h-del" title="Borrar" aria-label="Borrar">✕</button>
       </div>
-      <div class="h-input">${typeIcon(item.type)} ${escapeHtml(item.input)}</div>
+      <div class="h-input">${typeIcon(item.type)}<span>${escapeHtml(item.input)}</span></div>
       <div class="h-time">${fmtTime(item.timestamp)}</div>
       <div class="h-detail" hidden></div>
     `;

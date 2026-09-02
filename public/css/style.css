@@ -10,6 +10,17 @@
   --safe: #34d399;
   --radius: 10px;
   --bg-alt-hi: #16213a;
+
+  /* Escala de espaciado en múltiplos de 4. Antes había 18 valores distintos —7px, 9px, 11px,
+     13px, 15px— puestos a ojo uno a uno, y por eso nada quedaba alineado con nada. Todo el
+     espaciado de la app sale de aquí. */
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 20px;
+  --e6: 24px;
+  --e7: 32px;
 }
 
 /* Dark is the native register for a security console; light is the swapped-in variant. */
@@ -61,7 +72,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--e3) var(--e4);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -72,7 +83,7 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--e2);
   font-weight: 700;
   letter-spacing: 0.08em;
   font-size: 14px;
@@ -82,7 +93,7 @@ body {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--e3);
 }
 
 .icon-btn {
@@ -110,20 +121,10 @@ body {
 }
 .badge-offline.online { color: var(--warn); border-color: var(--warn); }
 
-.home-intro small {
-  display: block;
-  margin-top: 5px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-.home-intro {
-  margin-top: 4px;
-  font-size: 15.5px;
-  line-height: 1.45;
-  color: var(--text);
-}
 
-.category { margin-bottom: 24px; }
+
+.category { margin-bottom: var(--e7); }
+.category:last-child { margin-bottom: 0; }
 
 .category-title {
   font-size: 12px;
@@ -131,27 +132,28 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
-  margin: 0 0 10px;
+  margin: 0 0 var(--e3);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: var(--e3);
 }
 
 .tool-card {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 15px 13px 14px;
-  min-height: 116px;
+  padding: var(--e4);
+  gap: var(--e1);
+  min-height: 118px;
   justify-content: flex-start;
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--e1);
   text-align: left;
   cursor: pointer;
   font-weight: 400;
@@ -200,15 +202,15 @@ body {
   border: none;
   color: var(--text-dim);
   font-size: 13px;
-  padding: 0;
-  margin-bottom: 12px;
+  padding: var(--e1) 0;
+  margin: 0 0 var(--e3);
   cursor: pointer;
 }
 .back-btn:active { transform: none; opacity: 0.7; }
 
 main {
   flex: 1;
-  padding: 16px;
+  padding: var(--e4) var(--e4) var(--e7);
   max-width: 720px;
   width: 100%;
   margin: 0 auto;
@@ -218,21 +220,38 @@ main {
 .panel.active { display: block; }
 
 h1 {
-  font-size: 20px;
-  margin: 4px 0 6px;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--e2);
 }
 
 .hint {
   color: var(--text-dim);
   font-size: 13px;
   line-height: 1.5;
-  margin-bottom: 16px;
+  margin: 0 0 var(--e4);
+}
+
+/* Va después de .hint a propósito: con la misma especificidad manda la última, y antes .hint
+   pisaba el color, así que la frase principal salía tan apagada como la letra pequeña. */
+.hint.home-intro {
+  margin: 0 0 var(--e6);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.hint.home-intro small {
+  display: block;
+  margin-top: var(--e2);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
 }
 
 .row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--e2);
+  margin: 0 0 var(--e3);
 }
 
 input[type="text"],
@@ -241,7 +260,7 @@ input[type="password"] {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 12px 14px;
+  padding: var(--e3) var(--e4);
   border-radius: var(--radius);
   font-size: 15px;
 }
@@ -254,19 +273,19 @@ textarea {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 12px 14px;
+  padding: var(--e3) var(--e4);
   border-radius: var(--radius);
   font-size: 14px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   resize: vertical;
-  margin-bottom: 10px;
+  margin: 0 0 var(--e3);
 }
 
 button {
   background: var(--accent);
   color: #06281c;
   border: none;
-  padding: 12px 18px;
+  padding: var(--e3) var(--e5);
   border-radius: var(--radius);
   font-size: 14px;
   font-weight: 600;
@@ -286,15 +305,15 @@ button.danger-btn {
 .sample-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: var(--e2);
+  margin: var(--e5) 0 var(--e3);
 }
 
 .sample-btn {
   background: transparent;
   border: 1px dashed var(--border);
   color: var(--text-dim);
-  padding: 7px 12px;
+  padding: var(--e2) var(--e3);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -309,10 +328,10 @@ button.danger-btn {
 .toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--e3);
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 4px;
+  margin: var(--e4) 0 var(--e2);
   cursor: pointer;
 }
 /* Interruptor de verdad en vez de una casilla: el ajuste decide si los datos salen del
@@ -358,17 +377,17 @@ button.danger-btn {
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.3);
   border-radius: var(--radius);
-  padding: 10px 12px;
-  margin: 8px 0 16px;
+  padding: var(--e3);
+  margin: 0 0 var(--e4);
 }
 
 .dropzone {
   border: 2px dashed var(--border);
   border-radius: var(--radius);
-  padding: 32px 16px;
+  padding: var(--e7) var(--e4);
   text-align: center;
   color: var(--text-dim);
-  margin-bottom: 16px;
+  margin: 0 0 var(--e4);
 }
 .dropzone.dragover {
   border-color: var(--accent);
@@ -377,11 +396,11 @@ button.danger-btn {
 
 .filebtn {
   display: inline-block;
-  margin-top: 10px;
+  margin-top: var(--e3);
   background: var(--bg-alt);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 10px 16px;
+  padding: var(--e3) var(--e4);
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 13px;
@@ -390,10 +409,14 @@ button.danger-btn {
 .result {
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-top: 12px;
+  border-radius: 14px;
+  padding: var(--e4);
+  margin: var(--e5) 0 0;
 }
+/* Las partes de un resultado se separan solas y siempre igual, en vez de que cada trozo de
+   plantilla lleve su propio margen — que es como se habían ido descuadrando. */
+.result > * { margin-bottom: var(--e3); }
+.result > *:last-child { margin-bottom: 0; }
 
 /* ---- Veredicto ----
    Es lo único que mucha gente va a leer, así que ocupa el espacio de lo que es: la respuesta.
@@ -403,13 +426,15 @@ button.danger-btn {
 .verdict-block {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 14px 14px 12px;
+  gap: var(--e3);
+  padding: var(--e3);
   border-radius: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-left: 4px solid var(--text-dim);
-  margin-bottom: 12px;
+}
+@media (min-width: 400px) {
+  .verdict-block { gap: var(--e4); padding: var(--e4); }
 }
 .verdict-block.safe { border-left-color: var(--safe); }
 .verdict-block.suspicious { border-left-color: var(--warn); }
@@ -427,7 +452,10 @@ button.danger-btn {
 .verdict-block.dangerous .verdict-text strong { color: var(--danger); }
 .verdict-text span { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
 
-.gauge { width: 62px; height: 62px; flex-shrink: 0; }
+.gauge { width: 56px; height: 56px; flex-shrink: 0; }
+@media (min-width: 400px) {
+  .gauge { width: 62px; height: 62px; }
+}
 .gauge-track {
   fill: none;
   stroke: var(--border);
@@ -467,7 +495,6 @@ button.danger-btn {
 .score {
   color: var(--text-dim);
   font-size: 13px;
-  margin-bottom: 10px;
 }
 
 .verdict {
@@ -476,9 +503,8 @@ button.danger-btn {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 4px 10px;
+  padding: var(--e1) var(--e3);
   border-radius: 999px;
-  margin-bottom: 10px;
 }
 .verdict.safe { background: rgba(52, 211, 153, 0.15); color: var(--safe); }
 .verdict.suspicious { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
@@ -490,9 +516,8 @@ button.danger-btn {
   font-size: 13px;
   word-break: break-all;
   background: var(--bg);
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 10px;
+  border-radius: 9px;
+  padding: var(--e3);
 }
 .chain .arrow { color: var(--text-dim); padding: 0 4px; }
 
@@ -504,9 +529,8 @@ button.danger-btn {
   word-break: break-all;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 10px;
+  border-radius: 9px;
+  padding: var(--e3);
 }
 
 .flags {
@@ -515,7 +539,7 @@ button.danger-btn {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--e2);
 }
 /* Las señales se ordenan por gravedad y se pintan con peso distinto. Antes todas se veían
    igual: "está en las listas de phishing" (80 puntos) parecía tan importante como "el TLD es
@@ -524,7 +548,7 @@ button.danger-btn {
 .flags li {
   font-size: 13px;
   line-height: 1.45;
-  padding: 9px 11px 9px 12px;
+  padding: var(--e3);
   background: var(--bg);
   border-radius: 9px;
   border-left: 3px solid var(--border);
@@ -567,8 +591,8 @@ button.danger-btn {
 
 .meta {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-dim);
-  margin-top: 10px;
 }
 .meta.mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -578,30 +602,44 @@ button.danger-btn {
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--e2);
 }
 .history-item {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: var(--e3);
   cursor: pointer;
 }
 .history-item .h-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--e2);
 }
 .history-item .h-input {
   font-size: 13px;
   word-break: break-all;
   flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e2);
+}
+.h-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .history-item .h-time {
   font-size: 11px;
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: var(--e1);
 }
 .history-item .h-del {
   background: transparent;
@@ -615,14 +653,15 @@ button.danger-btn {
   color: var(--text-dim);
   font-size: 13px;
   text-align: center;
-  padding: 24px 0;
+  padding: var(--e6) 0;
 }
 
 .footer {
   text-align: center;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--text-dim);
-  padding: 14px;
+  padding: var(--e4);
   border-top: 1px solid var(--border);
 }
 
@@ -634,8 +673,8 @@ button.danger-btn {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  margin-top: 14px;
+  gap: var(--e3);
+  margin-top: var(--e4);
 }
 .offline-notice .enable-net-btn {
   border-style: solid;
@@ -647,8 +686,8 @@ button.danger-btn {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  margin-top: 14px;
+  gap: var(--e3);
+  margin-top: var(--e4);
 }
 .preview-note a {
   border-style: solid;
@@ -667,22 +706,22 @@ button.danger-btn {
   font-size: 15px;
   line-height: 1.5;
   color: var(--text);
-  margin-bottom: 8px;
+  margin: 0 0 var(--e2);
 }
 
 .detalle {
-  margin: 0 0 14px;
+  margin: 0 0 var(--e5);
   font-size: 13px;
 }
 .detalle > summary {
   cursor: pointer;
   color: var(--text-dim);
   font-size: 13px;
-  padding: 5px 0;
+  padding: var(--e1) 0;
   list-style: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--e2);
   user-select: none;
 }
 .detalle > summary::-webkit-details-marker { display: none; }
@@ -698,11 +737,11 @@ button.danger-btn {
 .detalle[open] > summary::before { transform: rotate(-135deg) translate(-2px, -2px); }
 .detalle > summary:hover { color: var(--text); }
 .detalle > p {
-  margin: 4px 0 0;
+  margin: var(--e1) 0 0;
   color: var(--text-dim);
   line-height: 1.55;
   border-left: 2px solid var(--border);
-  padding-left: 11px;
+  padding-left: var(--e3);
 }
 
 /* La etiqueta del interruptor dice el efecto arriba y la letra pequeña la consecuencia. */
@@ -718,8 +757,8 @@ button.danger-btn {
   min-height: 0;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding: 14px 14px;
+  gap: 0 var(--e3);
+  padding: var(--e4);
   flex-wrap: wrap;
 }
 .tool-card.ancha .tool-icon { margin-bottom: 0; }
@@ -732,6 +771,7 @@ button.danger-btn {
 /* El aviso de "solo offline" es una advertencia sobre el alcance del análisis, no un hallazgo
    sobre el enlace. Antes iba en amarillo intenso y pesaba tanto como el veredicto. */
 .offline-notice {
+  margin-top: var(--e1);
   border-color: var(--border);
   color: var(--text-dim);
   background: var(--bg);

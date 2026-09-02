@@ -51,7 +51,7 @@
 <main id="main">
 
   <section id="panel-home" class="panel active">
-    <p class="hint home-intro">¿Te ha llegado algo raro? Elige qué es y te digo si puedes fiarte.<br><small>Todo se analiza en tu móvil. Nada sale de aquí salvo que tú lo actives.</small></p>
+    <p class="hint home-intro">¿Te ha llegado algo raro? Elige qué es y te digo si puedes fiarte.<small>Todo se analiza en tu móvil. Nada sale de aquí salvo que tú lo actives.</small></p>
 
     <div class="category">
       <h2 class="category-title">Comunicaciones</h2>
@@ -379,7 +379,10 @@
   <section id="panel-qr" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>QR</h1>
-    <p class="hint lead">Un código QR es el único enlace que no puedes leer antes de abrirlo, y por eso funciona pegar una pegatina encima del código de un parquímetro, una multa o la carta de un bar. Sube la foto del código y verás <strong>qué contiene exactamente</strong> antes de que tu móvil haga nada con él. La imagen se lee en tu dispositivo, no se sube a ningún sitio.</p>
+    <p class="hint lead">Un QR es el único enlace que no puedes leer antes de abrirlo. Sube la foto y verás <strong>qué contiene exactamente</strong> antes de que tu móvil haga nada con él.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Por eso funciona pegar una pegatina encima del código de un parquímetro, una multa o la carta de un bar. Se decodifica con el propio navegador —la imagen no sale de tu dispositivo— y se clasifica el contenido: si es un enlace pasa por el análisis de URLs completo, y se avisa aparte de las cargas propias del formato (alta de doble factor, wifi abierta, SMS ya redactado, números de tarificación especial, solicitudes de pago).</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleQrSafe">✅ QR normal</button>
       <button type="button" class="sample-btn danger" id="sampleQrMalicious">🚩 QR de pegatina falsa</button>

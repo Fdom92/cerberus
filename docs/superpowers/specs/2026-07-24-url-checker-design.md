@@ -632,3 +632,32 @@ Un bug que salió al hacerlo: `checkFile()` calculaba el riesgo solo para guarda
 historial y no lo devolvía, así que el medidor pintaba un 0 al lado de "No lo abras ni lo
 ejecutes". Arreglado en origen, y el medidor se omite si un módulo no da puntuación en vez de
 inventar un cero.
+
+
+### Ritmo vertical y espaciado (2026-09-02)
+
+Había **18 valores distintos** de espaciado —7px, 9px, 11px, 13px, 15px, 18px— puestos a ojo
+regla a regla. Por eso nada quedaba alineado con nada, aunque cada pantalla por separado
+pareciera razonable.
+
+Ahora todo el espaciado sale de una escala de múltiplos de 4 (`--e1`..`--e7`) declarada en
+`:root`. La jerarquía es la que se lee: **8** dentro de un mismo grupo, **12** entre elementos
+relacionados, **16–20** entre bloques distintos.
+
+El ritmo de un panel queda: volver (12) → título (8) → frase llana (8) → desplegable (20) →
+botones de prueba (12) → formulario (16) → interruptor (20) → resultado.
+
+Dos decisiones que conviene no deshacer:
+
+- **`.result > *` fija la separación interna del resultado** en un solo sitio, en vez de que
+  cada trozo de plantilla lleve su propio margen. Así es como se habían ido descuadrando: cada
+  módulo pintaba su HTML con márgenes propios y ninguno coincidía con el de al lado.
+- **El margen superior de `.sample-row`** fija la separación con el bloque de cabecera aunque
+  ese bloque no lleve desplegable. Los márgenes verticales de hermanos colapsan al mayor, así
+  que sale 20 en los dos casos. Sin esto, el panel de QR —que no tenía desplegable— dejaba la
+  frase pegada a los botones.
+
+De paso: el historial seguía mostrando `DANGEROUS`/`SUSPICIOUS` en inglés y con emojis, que era
+lo único que quedaba sin traducir ni pasar al conjunto de iconos SVG.
+
+Verificado midiendo los huecos reales del DOM en los catorce paneles: todos caen en la escala.
