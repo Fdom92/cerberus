@@ -47,7 +47,7 @@ const SHORTENERS = [
   "cutt.ly", "bit.do", "tiny.cc", "shorturl.at", "s.id", "rb.gy", "v.gd", "tr.im", "shrtco.de", "x.co",
 ];
 
-const FLAG_POINTS = {
+export const SMS_FLAG_POINTS = {
   threat_intel_blocked: 80,
   family_impersonation: 45,
   brand_domain_mismatch: 40,
@@ -142,7 +142,7 @@ export async function checkSms(rawText, { networkEnabled = false, persist = true
     if (!anyMatch) flags.push("brand_domain_mismatch");
   }
 
-  const riskScore = Math.min(100, flags.reduce((sum, f) => sum + (FLAG_POINTS[f] || 0), 0));
+  const riskScore = Math.min(100, flags.reduce((sum, f) => sum + (SMS_FLAG_POINTS[f] || 0), 0));
   const verdict = riskScore >= 70 ? "dangerous" : riskScore >= 30 ? "suspicious" : "safe";
 
   const result = {

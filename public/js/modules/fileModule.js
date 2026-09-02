@@ -122,10 +122,15 @@ export async function checkFile(file) {
 
   const hash = file.size <= HASH_SIZE_LIMIT ? await sha256Hex(file) : null;
 
+  // El riesgo se calculaba solo para guardarlo en el historial y no se devolvía, así que
+  // quien pintaba el resultado no lo tenía: el medidor salía a 0 junto a un "No lo abras".
+  const riskScore = verdict === "dangerous" ? 90 : 0;
+
   const result = {
     type: "file",
     input: file.name,
     size: file.size,
+    riskScore,
     declaredExt: declaredExt || "(sin extensión)",
     detected: sig ? sig.name : "Desconocido",
     executable: sig ? sig.executable : false,
@@ -142,7 +147,7 @@ export async function checkFile(file) {
     type: "file",
     input: file.name,
     verdict,
-    riskScore: verdict === "dangerous" ? 90 : verdict === "unknown" ? 0 : 0,
+    riskScore,
     flags,
     timestamp: result.timestamp,
     raw: result,

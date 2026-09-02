@@ -591,3 +591,44 @@ interruptor (la decisión duradera), `isNetEnabled()` lo que consulta el anális
 
 Los accesos a `localStorage` van con `try/catch`: en modo privado pueden lanzar, y ante la
 duda lo correcto es **no** salir a la red.
+
+
+### Repaso de interfaz (2026-09-02)
+
+El contenido era correcto pero la interfaz no lo comunicaba. Cambios y por qué:
+
+**El veredicto decía "SUSPICIOUS"** — en inglés, en una app en español, como una etiqueta de
+categoría. Ahora dice qué hacer y varía según la herramienta: un enlace no se abre, un mensaje
+no se responde, un archivo no se ejecuta, y un hallazgo de Secretos "hay que arreglarlo" (no es
+un fraude que intente engañarte, es algo tuyo que no debería estar ahí).
+
+`safe` sigue sin decir nunca "es seguro": dice "Sin señales de riesgo" y matiza que no ha
+encontrado ninguna de las señales que sabe buscar, que no es garantía. Esa distinción es la
+misma que rige todo el proyecto y no se relaja por hacer la interfaz más amable.
+
+**El riesgo era un `60/100` suelto.** Ahora hay un anillo SVG que lo dibuja al aparecer. Es el
+único movimiento de la pantalla, precisamente para que lleve la mirada al dato en vez de
+competir con él.
+
+**Todas las señales se veían iguales.** Ahora se ordenan por puntos y se sombrean por
+gravedad. Las de 0 puntos (límites de la app, tipo "no se pudo resolver el destino") van al
+final y apagadas: son limitaciones nuestras, no acusaciones al enlace. Para los módulos que no
+publican tabla de puntos la gravedad se **hereda del veredicto** en vez de mantener una segunda
+tabla en la interfaz — que es exactamente el fallo de desincronización que ya ha aparecido dos
+veces en este proyecto.
+
+**Iconos**: conjunto propio en SVG en línea. Antes eran emojis y cada sistema los dibuja a su
+manera — unos planos, otros en 3D, el del QR salía como un cuadrado negro. No parecían un
+conjunto.
+
+**Sin fuentes externas.** Traer una de Google Fonts contradiría "todo corre en tu dispositivo"
+y rompería el modo offline, así que se usa la pila del sistema. Es una restricción del
+proyecto, no un descuido.
+
+**Textos**: cada herramienta abre con una frase llana ("¿Ese documento.pdf es de verdad un
+PDF?") y el párrafo técnico se pliega en "Qué comprueba exactamente". No se ha quitado nada.
+
+Un bug que salió al hacerlo: `checkFile()` calculaba el riesgo solo para guardarlo en el
+historial y no lo devolvía, así que el medidor pintaba un 0 al lado de "No lo abras ni lo
+ejecutes". Arreglado en origen, y el medidor se omite si un módulo no da puntuación en vez de
+inventar un cero.

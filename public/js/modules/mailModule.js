@@ -13,7 +13,7 @@ const MAIL_CREDENTIAL_WORDS = [
   "mantengala pulsando", "mantener contraseña", "keep my password", "revalide su",
 ];
 
-const FLAG_POINTS = {
+export const MAIL_FLAG_POINTS = {
   threat_intel_blocked: 80,
   credential_request: 30,
   display_name_spoof: 50,
@@ -197,7 +197,7 @@ export async function checkMail(rawInput, { networkEnabled = false } = {}) {
     }
   }
 
-  const riskScore = Math.min(100, flags.reduce((sum, f) => sum + (FLAG_POINTS[f] || 0), 0));
+  const riskScore = Math.min(100, flags.reduce((sum, f) => sum + (MAIL_FLAG_POINTS[f] || 0), 0));
   const verdict = riskScore >= 70 ? "dangerous" : riskScore >= 30 ? "suspicious" : "safe";
 
   const result = {

@@ -14,6 +14,29 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- Conjunto de iconos propio: SVG en línea, mismo grosor de trazo y mismas terminaciones en
+     todos. Antes eran emojis, que cada sistema dibuja con un estilo distinto — unos planos,
+     otros en 3D, el del QR salía como un cuadrado negro — y no parecían un conjunto. Van
+     dentro del HTML porque la app tiene que funcionar sin red y sin dependencias. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="i-url"><path d="M9.5 14.5 14.5 9.5"/><path d="M11.5 6.5 13 5a4.2 4.2 0 0 1 6 6l-1.5 1.5"/><path d="M12.5 17.5 11 19a4.2 4.2 0 0 1-6-6l1.5-1.5"/></g>
+    <g id="i-mail"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 7.1 5.3a2 2 0 0 0 2.2 0L20.2 7"/></g>
+    <g id="i-sms"><path d="M20.5 12c0 3.9-3.8 7-8.5 7-1 0-2-.15-2.9-.42L4 20l1.2-3.4C4.15 15.3 3.5 13.7 3.5 12c0-3.9 3.8-7 8.5-7s8.5 3.1 8.5 7Z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" stroke-width="2.4"/></g>
+    <g id="i-qr"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.4"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.4"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.4"/><path d="M14 14h3v3h-3zM20.5 14v3M17.5 20.5h3M14 20.5h.01"/></g>
+    <g id="i-dns"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.2 2.4 3.3 5.3 3.3 8.5s-1.1 6.1-3.3 8.5c-2.2-2.4-3.3-5.3-3.3-8.5S9.8 5.9 12 3.5Z"/></g>
+    <g id="i-file"><path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M13.5 3.5V9H19"/><path d="M8.5 13.5h7M8.5 16.5h4.5"/></g>
+    <g id="i-exif"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m5 17 4.2-4.2a1.6 1.6 0 0 1 2.2 0L15 16.4"/><path d="m13.5 15 1.9-1.9a1.6 1.6 0 0 1 2.2 0L20.5 15.4"/></g>
+    <g id="i-decode"><path d="M8.5 4.5 4 12l4.5 7.5"/><path d="M15.5 4.5 20 12l-4.5 7.5"/><path d="M13.5 8 11 16"/></g>
+    <g id="i-secrets"><circle cx="8.2" cy="15.8" r="4.2"/><path d="m11.2 12.8 8-8"/><path d="m16.4 7.6 2.2 2.2"/><path d="m18.6 5.4 2.2 2.2"/></g>
+    <g id="i-apps"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 5.6h3"/><path d="M12 18.2h.01" stroke-width="2.4"/></g>
+    <g id="i-password"><rect x="4" y="10.5" width="16" height="10" rx="2.4"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/><path d="M12 14.4v2.3"/></g>
+    <g id="i-jwt"><path d="M12 3.2 4.5 6v6.2c0 4.2 3 7.4 7.5 8.6 4.5-1.2 7.5-4.4 7.5-8.6V6z"/><path d="m9 12 2.2 2.2L15.4 10"/></g>
+    <g id="i-webrtc"><path d="M12 19.5v-6"/><circle cx="12" cy="11.5" r="2"/><path d="M7.8 15.7a6 6 0 0 1 0-8.4M16.2 7.3a6 6 0 0 1 0 8.4"/><path d="M5 18.5a9.5 9.5 0 0 1 0-13M19 5.5a9.5 9.5 0 0 1 0 13"/></g>
+    <g id="i-history"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/></g>
+  </defs>
+</svg>
+
 <header class="topbar">
   <div class="brand" id="brandHome" role="button" tabindex="0" aria-label="Ir a inicio">
     <img src="icons/icon.svg" alt="" width="28" height="28">
@@ -21,42 +44,42 @@
   </div>
   <div class="topbar-actions">
     <span class="badge-offline" id="netBadge" title="Estado del interruptor de red compartido por URLs, QR, SMS y Correo. Archivos, EXIF, Secretos, Contraseña y JWT son siempre locales; DNS y Fuga WebRTC contactan servicios externos al pulsar su botón.">red: desactivada</span>
-    <button class="icon-btn" id="historyBtn" aria-label="Historial" title="Historial">🕘</button>
+    <button class="icon-btn" id="historyBtn" aria-label="Historial" title="Historial"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-history"/></svg></button>
   </div>
 </header>
 
 <main id="main">
 
   <section id="panel-home" class="panel active">
-    <p class="hint home-intro">Centro de mando de comprobaciones de ciberseguridad. Todo corre en tu dispositivo salvo donde se indique red opcional.</p>
+    <p class="hint home-intro">¿Te ha llegado algo raro? Elige qué es y te digo si puedes fiarte.<br><small>Todo se analiza en tu móvil. Nada sale de aquí salvo que tú lo actives.</small></p>
 
     <div class="category">
       <h2 class="category-title">Comunicaciones</h2>
       <div class="grid">
         <button class="tool-card" data-open="url">
-          <span class="tool-icon">🔗</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-url"/></svg>
           <span class="tool-label">URLs</span>
-          <span class="tool-desc">Enlaces y acortadores</span>
+          <span class="tool-desc">¿Puedo abrir este enlace?</span>
         </button>
         <button class="tool-card" data-open="mail">
-          <span class="tool-icon">✉️</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg>
           <span class="tool-label">Correo</span>
-          <span class="tool-desc">SPF/DKIM/DMARC</span>
+          <span class="tool-desc">¿Este email es quien dice ser?</span>
         </button>
         <button class="tool-card" data-open="sms">
-          <span class="tool-icon">💬</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sms"/></svg>
           <span class="tool-label">SMS</span>
-          <span class="tool-desc">Smishing</span>
+          <span class="tool-desc">¿Este mensaje es una estafa?</span>
         </button>
         <button class="tool-card" data-open="qr">
-          <span class="tool-icon">🔳</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-qr"/></svg>
           <span class="tool-label">QR</span>
-          <span class="tool-desc">A dónde lleva un código</span>
+          <span class="tool-desc">¿A dónde lleva este código?</span>
         </button>
-        <button class="tool-card" data-open="dns">
-          <span class="tool-icon">🌐</span>
+        <button class="tool-card ancha" data-open="dns">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-dns"/></svg>
           <span class="tool-label">DNS / SPF</span>
-          <span class="tool-desc">¿Tiene SPF/DMARC un dominio?</span>
+          <span class="tool-desc">¿Pueden falsificar correos de este dominio?</span>
         </button>
       </div>
     </div>
@@ -65,29 +88,29 @@
       <h2 class="category-title">Archivos y datos</h2>
       <div class="grid">
         <button class="tool-card" data-open="file">
-          <span class="tool-icon">📄</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg>
           <span class="tool-label">Archivos</span>
-          <span class="tool-desc">Magic bytes + hash</span>
+          <span class="tool-desc">¿Es de verdad lo que dice ser?</span>
         </button>
         <button class="tool-card" data-open="exif">
-          <span class="tool-icon">🖼️</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-exif"/></svg>
           <span class="tool-label">EXIF</span>
-          <span class="tool-desc">Metadatos de fotos</span>
+          <span class="tool-desc">¿Esta foto revela dónde la hice?</span>
         </button>
         <button class="tool-card" data-open="decode">
-          <span class="tool-icon">🔤</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-decode"/></svg>
           <span class="tool-label">Decodificador</span>
-          <span class="tool-desc">Base64 / Hex / URL</span>
+          <span class="tool-desc">¿Qué esconde este texto raro?</span>
         </button>
         <button class="tool-card" data-open="secrets">
-          <span class="tool-icon">🕵️</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-secrets"/></svg>
           <span class="tool-label">Secretos</span>
-          <span class="tool-desc">API keys en código</span>
+          <span class="tool-desc">¿He dejado claves en el código?</span>
         </button>
-        <button class="tool-card" data-open="apps">
-          <span class="tool-icon">📱</span>
+        <button class="tool-card ancha" data-open="apps">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-apps"/></svg>
           <span class="tool-label">Apps</span>
-          <span class="tool-desc">APK/IPA: permisos + secretos</span>
+          <span class="tool-desc">¿Qué permisos pide esta app?</span>
         </button>
       </div>
     </div>
@@ -96,19 +119,19 @@
       <h2 class="category-title">Cuenta y sesión</h2>
       <div class="grid">
         <button class="tool-card" data-open="password">
-          <span class="tool-icon">🔑</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-password"/></svg>
           <span class="tool-label">Contraseña</span>
-          <span class="tool-desc">Fuerza offline</span>
+          <span class="tool-desc">¿Es fuerte? ¿Está filtrada?</span>
         </button>
         <button class="tool-card" data-open="jwt">
-          <span class="tool-icon">🪪</span>
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-jwt"/></svg>
           <span class="tool-label">JWT</span>
-          <span class="tool-desc">Decodificar token</span>
+          <span class="tool-desc">¿Qué lleva dentro este token?</span>
         </button>
-        <button class="tool-card" data-open="webrtc">
-          <span class="tool-icon">📡</span>
+        <button class="tool-card ancha" data-open="webrtc">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-webrtc"/></svg>
           <span class="tool-label">Fuga WebRTC</span>
-          <span class="tool-desc">¿Tu VPN filtra tu IP?</span>
+          <span class="tool-desc">¿Mi VPN me está tapando?</span>
         </button>
       </div>
     </div>
@@ -117,8 +140,11 @@
 
   <section id="panel-url" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Verificador de URLs</h1>
-    <p class="hint">Analiza una URL (acortada o no): heurísticas de patrones, typosquatting y homógrafos siempre offline. Resolver el destino final y la edad del dominio requieren red — actívalo abajo si lo necesitas.</p>
+    <h1>URLs</h1>
+    <p class="hint lead">Pega un enlace y te digo si puedes fiarte de él. Detecta dominios que imitan a otros, letras cambiadas y enlaces acortados que esconden su destino.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Analiza una URL (acortada o no): heurísticas de patrones, typosquatting y homógrafos siempre offline. Resolver el destino final y la edad del dominio requieren red — actívalo abajo si lo necesitas.</p>
+    </details>
 
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleUrlSafe">✅ Probar seguro</button>
@@ -133,7 +159,7 @@
 
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
-      <span>Activar comprobaciones de red (destino final, antigüedad del dominio y listas de amenazas)</span>
+      <span><strong>Comprobar también en internet</strong><small>Mira a dónde lleva de verdad y si está denunciado. Sale una consulta de tu dispositivo.</small></span>
     </label>
     <p class="netwarn net-warn" hidden>
       Al activarlo: el dominio se consulta contra las listas de phishing y malware de <strong>Cloudflare</strong>; la URL se envía a <strong>api.microlink.io</strong> para averiguar a dónde lleva de verdad (25 consultas al día); y para fechar el dominio se consulta <strong>rdap.org</strong> y, en los dominios cuyo registro no publica RDAP (<code>.es</code>, <code>.eu</code>), el registro público de certificados <strong>crt.sh</strong>. No se envía nada más de tu dispositivo.
@@ -144,8 +170,11 @@
 
   <section id="panel-file" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Comprobador de archivos (magic bytes)</h1>
-    <p class="hint">Lee los primeros bytes del archivo para detectar su tipo real y compararlo con la extensión. Todo ocurre en tu dispositivo — el archivo nunca sale de aquí.</p>
+    <h1>Archivos</h1>
+    <p class="hint lead">¿Ese “documento.pdf” es de verdad un PDF? Mira dentro del archivo, no en el nombre.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Lee los primeros bytes del archivo para detectar su tipo real y compararlo con la extensión. Todo ocurre en tu dispositivo — el archivo nunca sale de aquí.</p>
+    </details>
 
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleFileSafe">✅ Probar seguro</button>
@@ -175,15 +204,18 @@
 
   <section id="panel-mail" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Análisis de correo</h1>
-    <p class="hint">Pega las cabeceras completas del correo (o el .eml entero) — en Gmail: "Mostrar original"; en Outlook: "Ver origen del mensaje". Se analiza SPF/DKIM/DMARC, coincidencia From/Return-Path/Reply-To y suplantación de marca. Todo offline, texto local.</p>
+    <h1>Correo</h1>
+    <p class="hint lead">¿El correo es de quien dice ser? Pega sus cabeceras y te digo si alguien lo está suplantando.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Pega las cabeceras completas del correo (o el .eml entero) — en Gmail: "Mostrar original"; en Outlook: "Ver origen del mensaje". Se analiza SPF/DKIM/DMARC, coincidencia From/Return-Path/Reply-To y suplantación de marca. Todo offline, texto local.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleMailSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleMailMalicious">🚩 Probar malicioso</button>
     </div>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
-      <span>Comprobar los enlaces contra listas de amenazas (requiere red)</span>
+      <span><strong>Comprobar también en internet</strong><small>Mira si los enlaces del mensaje están denunciados. Sale una consulta de tu dispositivo.</small></span>
     </label>
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
@@ -197,15 +229,18 @@
 
   <section id="panel-sms" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Análisis de SMS / mensajes</h1>
-    <p class="hint">Pega el texto del SMS o mensaje sospechoso. Se buscan patrones de smishing: urgencia, ganchos, peticiones de credenciales y enlaces (acortados, typosquat, IP literal…). Todo offline.</p>
+    <h1>SMS y mensajes</h1>
+    <p class="hint lead">Pega un SMS o WhatsApp sospechoso y te digo si tiene pinta de estafa.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Pega el texto del SMS o mensaje sospechoso. Se buscan patrones de smishing: urgencia, ganchos, peticiones de credenciales y enlaces (acortados, typosquat, IP literal…). Todo offline.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleSmsSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleSmsMalicious">🚩 Probar malicioso</button>
     </div>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
-      <span>Comprobar los enlaces contra listas de amenazas (requiere red)</span>
+      <span><strong>Comprobar también en internet</strong><small>Mira si los enlaces del mensaje están denunciados. Sale una consulta de tu dispositivo.</small></span>
     </label>
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
@@ -219,8 +254,11 @@
 
   <section id="panel-dns" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>DNS / SPF de un dominio</h1>
-    <p class="hint">Comprueba si un dominio tiene SPF y DMARC configurados — sin esto, es más fácil falsificar correos "de" ese dominio. Útil para verificar el tuyo propio o el de una empresa que te escribió. Consulta DNS pública (Cloudflare) — el dominio nunca se guarda salvo el propio resultado en tu historial.</p>
+    <h1>DNS / SPF</h1>
+    <p class="hint lead">¿Cualquiera puede mandar correos haciéndose pasar por este dominio? Útil para comprobar el tuyo.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Comprueba si un dominio tiene SPF y DMARC configurados — sin esto, es más fácil falsificar correos "de" ese dominio. Útil para verificar el tuyo propio o el de una empresa que te escribió. Consulta DNS pública (Cloudflare) — el dominio nunca se guarda salvo el propio resultado en tu historial.</p>
+    </details>
     <form id="dnsForm" class="row">
       <input id="dnsInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ejemplo.com" required>
       <button type="submit">Comprobar</button>
@@ -231,7 +269,10 @@
   <section id="panel-jwt" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>JWT</h1>
-    <p class="hint">Decodifica un JWT (header + payload). No verifica la firma — solo lectura, ideal para inspeccionar tokens sin exponerlos a servicios externos. No se guarda en historial.</p>
+    <p class="hint lead">Mira qué lleva dentro un token JWT, sin mandarlo a ninguna web.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Decodifica un JWT (header + payload). No verifica la firma — solo lectura, ideal para inspeccionar tokens sin exponerlos a servicios externos. No se guarda en historial.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleJwtSafe">✅ Probar válido</button>
       <button type="button" class="sample-btn danger" id="sampleJwtMalicious">🚩 Probar alg:none</button>
@@ -245,8 +286,11 @@
 
   <section id="panel-webrtc" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Fuga WebRTC / VPN</h1>
-    <p class="hint">Cualquier web puede usar WebRTC para preguntarle a tu navegador tu IP local y tu IP pública vista por un servidor STUN — sin permiso, sin aviso. Si usas VPN, esa consulta a veces se salta el túnel y revela tu IP real. Esta comprobación hace lo mismo a propósito y lo compara contra tu IP pública vista por una petición HTTPS normal (que sí pasa por la VPN), para que veas si hay discrepancia.</p>
+    <h1>Fuga de IP (WebRTC)</h1>
+    <p class="hint lead">¿Tu VPN te está tapando de verdad? Comprueba si tu IP real se escapa por WebRTC.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Cualquier web puede usar WebRTC para preguntarle a tu navegador tu IP local y tu IP pública vista por un servidor STUN — sin permiso, sin aviso. Si usas VPN, esa consulta a veces se salta el túnel y revela tu IP real. Esta comprobación hace lo mismo a propósito y lo compara contra tu IP pública vista por una petición HTTPS normal (que sí pasa por la VPN), para que veas si hay discrepancia.</p>
+    </details>
     <p class="netwarn">Al pulsar, tu navegador contacta <strong>stun.l.google.com</strong> (STUN) y <strong>api.ipify.org</strong> (IP pública) para comparar. No se guarda nada en historial — es información sobre ti, no un archivo o mensaje externo.</p>
     <button type="button" id="webrtcRun">🔍 Ejecutar comprobación</button>
     <div id="webrtcResult" class="result" hidden></div>
@@ -255,7 +299,10 @@
   <section id="panel-password" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Contraseña</h1>
-    <p class="hint">Estimación de fuerza offline (entropía + patrones comunes). La contraseña no se envía ni se guarda en ningún sitio, ni siquiera en el historial.</p>
+    <p class="hint lead">¿Es fuerte tu contraseña? Y si quieres, si ha aparecido en alguna filtración.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Estimación de fuerza offline (entropía + patrones comunes). La contraseña no se envía ni se guarda en ningún sitio, ni siquiera en el historial.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn danger" id="samplePasswordWeak">🚩 Probar débil</button>
       <button type="button" class="sample-btn" id="samplePasswordStrong">✅ Probar fuerte</button>
@@ -276,7 +323,10 @@
   <section id="panel-decode" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>Decodificador</h1>
-    <p class="hint">Prueba Base64, Base64url, Hex y URL-decode sobre el texto — útil para inspeccionar payloads ofuscados.</p>
+    <p class="hint lead">¿Te has topado con un texto raro tipo <code>aHR0cHM6...</code>? Aquí se ve qué dice.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Prueba Base64, Base64url, Hex y URL-decode sobre el texto — útil para inspeccionar payloads ofuscados.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleDecode">▶ Probar ejemplo</button>
     </div>
@@ -289,8 +339,11 @@
 
   <section id="panel-secrets" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Escáner de secretos</h1>
-    <p class="hint">Pega código o config: busca AWS/GitHub/Slack/Stripe/Google keys, tokens, claves privadas y asignaciones tipo <code>api_key=...</code>. Los valores se muestran parcialmente ocultos. No se guarda en historial.</p>
+    <h1>Secretos</h1>
+    <p class="hint lead">¿Se te ha colado una clave o un token en el código? Pega el código y lo busco.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Pega código o config: busca AWS/GitHub/Slack/Stripe/Google keys, tokens, claves privadas y asignaciones tipo <code>api_key=...</code>. Los valores se muestran parcialmente ocultos. No se guarda en historial.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleSecretsSafe">✅ Probar limpio</button>
       <button type="button" class="sample-btn danger" id="sampleSecretsMalicious">🚩 Probar con secretos</button>
@@ -304,8 +357,11 @@
 
   <section id="panel-apps" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
-    <h1>Apps (APK / IPA)</h1>
-    <p class="hint">Sube un .apk o .ipa: extrae el manifest (<code>AndroidManifest.xml</code> o <code>Info.plist</code>) — paquete + permisos declarados, marcando los peligrosos — y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
+    <h1>Apps</h1>
+    <p class="hint lead">¿Qué permisos pide de verdad esta app? Sube el .apk o .ipa y te lo enseño.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Sube un .apk o .ipa: extrae el manifest (<code>AndroidManifest.xml</code> o <code>Info.plist</code>) — paquete + permisos declarados, marcando los peligrosos — y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn danger" id="sampleAppsApk">🤖 Probar APK sospechosa</button>
       <button type="button" class="sample-btn danger" id="sampleAppsIpa">🍎 Probar IPA sospechosa</button>
@@ -323,7 +379,7 @@
   <section id="panel-qr" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>QR</h1>
-    <p class="hint">Un código QR es el único enlace que no puedes leer antes de abrirlo, y por eso funciona pegar una pegatina encima del código de un parquímetro, una multa o la carta de un bar. Sube la foto del código y verás <strong>qué contiene exactamente</strong> antes de que tu móvil haga nada con él. La imagen se lee en tu dispositivo, no se sube a ningún sitio.</p>
+    <p class="hint lead">Un código QR es el único enlace que no puedes leer antes de abrirlo, y por eso funciona pegar una pegatina encima del código de un parquímetro, una multa o la carta de un bar. Sube la foto del código y verás <strong>qué contiene exactamente</strong> antes de que tu móvil haga nada con él. La imagen se lee en tu dispositivo, no se sube a ningún sitio.</p>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleQrSafe">✅ QR normal</button>
       <button type="button" class="sample-btn danger" id="sampleQrMalicious">🚩 QR de pegatina falsa</button>
@@ -345,7 +401,7 @@
     </form>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
-      <span>Activar comprobaciones de red (destino final, antigüedad del dominio y listas de amenazas)</span>
+      <span><strong>Comprobar también en internet</strong><small>Mira a dónde lleva de verdad y si está denunciado. Sale una consulta de tu dispositivo.</small></span>
     </label>
     <p class="netwarn net-warn" hidden>
       Solo se usa si el código contiene un enlace, y entonces se comprueba igual que en la herramienta de URLs: listas de <strong>Cloudflare</strong>, destino final vía <strong>api.microlink.io</strong> y antigüedad del dominio vía <strong>rdap.org</strong> / <strong>crt.sh</strong>. La imagen del código nunca sale de tu dispositivo.
@@ -357,7 +413,10 @@
   <section id="panel-exif" class="panel">
     <button class="back-btn" data-back>← Inicio</button>
     <h1>EXIF</h1>
-    <p class="hint">Lee metadatos EXIF de una foto (JPEG): cámara, fecha y — lo más importante antes de compartirla — si lleva coordenadas GPS. Se procesa en tu dispositivo.</p>
+    <p class="hint lead">Antes de compartir una foto: mira si lleva escrito dónde la hiciste.</p>
+    <details class="detalle"><summary>Qué comprueba exactamente</summary>
+      <p>Lee metadatos EXIF de una foto (JPEG): cámara, fecha y — lo más importante antes de compartirla — si lleva coordenadas GPS. Se procesa en tu dispositivo.</p>
+    </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleExifClean">✅ Foto sin GPS</button>
       <button type="button" class="sample-btn danger" id="sampleExifGps">🚩 Foto con GPS</button>

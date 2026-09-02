@@ -9,6 +9,7 @@
   --warn: #fbbf24;
   --safe: #34d399;
   --radius: 10px;
+  --bg-alt-hi: #16213a;
 }
 
 /* Dark is the native register for a security console; light is the swapped-in variant. */
@@ -16,6 +17,7 @@
   :root:not([data-theme="dark"]) {
     --bg: #f3f5f9;
     --bg-alt: #ffffff;
+    --bg-alt-hi: #eef2f8;
     --border: #d9dfe9;
     --text: #101828;
     --text-dim: #5b6478;
@@ -28,6 +30,7 @@
 :root[data-theme="light"] {
   --bg: #f3f5f9;
   --bg-alt: #ffffff;
+  --bg-alt-hi: #eef2f8;
   --border: #d9dfe9;
   --text: #101828;
   --text-dim: #5b6478;
@@ -107,8 +110,17 @@ body {
 }
 .badge-offline.online { color: var(--warn); border-color: var(--warn); }
 
+.home-intro small {
+  display: block;
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
 .home-intro {
   margin-top: 4px;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--text);
 }
 
 .category { margin-bottom: 24px; }
@@ -131,8 +143,11 @@ body {
 .tool-card {
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 14px;
+  border-radius: 14px;
+  padding: 15px 13px 14px;
+  min-height: 116px;
+  justify-content: flex-start;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -142,15 +157,43 @@ body {
   font-weight: 400;
   color: var(--text);
 }
-.tool-card:active { transform: scale(0.98); }
+.tool-card:active { transform: scale(0.97); }
+@media (hover: hover) {
+  .tool-card:hover { border-color: var(--accent); background: var(--bg-alt-hi); }
+}
+.tool-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tool-card.disabled,
 .tool-card:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.tool-icon { font-size: 22px; }
-.tool-label { font-size: 14px; font-weight: 600; }
-.tool-desc { font-size: 11px; color: var(--text-dim); }
+/* Los iconos son SVG de trazo, todos con el mismo grosor y las mismas terminaciones, para que
+   se lean como un conjunto. El color lo hereda del texto, así que el tema claro/oscuro y los
+   estados los resuelve currentColor sin duplicar reglas. */
+.tool-icon {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  margin-bottom: 2px;
+  transition: transform 0.18s ease;
+}
+.tool-card:active .tool-icon { transform: scale(0.9); }
+.tool-label { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.tool-desc { font-size: 12px; color: var(--text-dim); line-height: 1.35; }
+
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 .back-btn {
   background: transparent;
@@ -272,7 +315,42 @@ button.danger-btn {
   margin-bottom: 4px;
   cursor: pointer;
 }
-.toggle input { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+/* Interruptor de verdad en vez de una casilla: el ajuste decide si los datos salen del
+   dispositivo, y un control que se lee de un vistazo como encendido/apagado importa. */
+.toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  margin: 0;
+}
+.toggle input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform 0.2s cubic-bezier(0.3, 0.9, 0.4, 1), background 0.2s ease;
+}
+.toggle input:checked {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+.toggle input:checked::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+.toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .netwarn {
   font-size: 12px;
@@ -317,11 +395,86 @@ button.danger-btn {
   margin-top: 12px;
 }
 
+/* ---- Veredicto ----
+   Es lo único que mucha gente va a leer, así que ocupa el espacio de lo que es: la respuesta.
+   El medidor da la magnitud de un vistazo (un "60/100" suelto no significa nada para quien
+   no vive de esto) y el texto dice qué hacer. La banda de color de la izquierda repite la
+   señal para quien no distinga bien los colores del anillo. */
+.verdict-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 14px 14px 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-dim);
+  margin-bottom: 12px;
+}
+.verdict-block.safe { border-left-color: var(--safe); }
+.verdict-block.suspicious { border-left-color: var(--warn); }
+.verdict-block.dangerous { border-left-color: var(--danger); }
+
+.verdict-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.verdict-text strong {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+.verdict-block.safe .verdict-text strong { color: var(--safe); }
+.verdict-block.suspicious .verdict-text strong { color: var(--warn); }
+.verdict-block.dangerous .verdict-text strong { color: var(--danger); }
+.verdict-text span { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
+
+.gauge { width: 62px; height: 62px; flex-shrink: 0; }
+.gauge-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 6;
+}
+.gauge-value {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  stroke-dashoffset: var(--recorte);
+}
+.gauge-value.safe { stroke: var(--safe); }
+.gauge-value.suspicious { stroke: var(--warn); }
+.gauge-value.dangerous { stroke: var(--danger); }
+.gauge-value.unknown { stroke: var(--text-dim); }
+.gauge-num {
+  fill: var(--text);
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El anillo se dibuja al aparecer. Es el único movimiento de la pantalla y por eso funciona:
+   lleva la mirada al dato que importa en vez de competir con él. */
+@media (prefers-reduced-motion: no-preference) {
+  .gauge-value {
+    animation: barrido 0.75s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+  }
+  @keyframes barrido {
+    from { stroke-dashoffset: var(--vuelta); }
+    to { stroke-dashoffset: var(--recorte); }
+  }
+}
+
+.score {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
 .verdict {
   display: inline-block;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 4px 10px;
   border-radius: 999px;
@@ -331,12 +484,6 @@ button.danger-btn {
 .verdict.suspicious { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
 .verdict.dangerous { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
 .verdict.unknown { background: rgba(142, 160, 189, 0.15); color: var(--text-dim); }
-
-.score {
-  color: var(--text-dim);
-  font-size: 13px;
-  margin-bottom: 10px;
-}
 
 .chain {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -370,13 +517,50 @@ button.danger-btn {
   flex-direction: column;
   gap: 6px;
 }
+/* Las señales se ordenan por gravedad y se pintan con peso distinto. Antes todas se veían
+   igual: "está en las listas de phishing" (80 puntos) parecía tan importante como "el TLD es
+   barato" (15), y la que importaba se perdía. El punto de color acompaña al grosor del borde
+   para no depender solo del color. */
 .flags li {
   font-size: 13px;
-  padding: 8px 10px;
+  line-height: 1.45;
+  padding: 9px 11px 9px 12px;
   background: var(--bg);
-  border-radius: 8px;
+  border-radius: 9px;
   border-left: 3px solid var(--border);
+  position: relative;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .flags li {
+    animation: aparece 0.32s ease both;
+    animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+  }
+  @keyframes aparece {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+.flags li.sev-alta {
+  border-left-width: 4px;
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--bg));
+  font-weight: 500;
+}
+.flags li.sev-media { border-left-color: var(--warn); }
+.flags li.sev-baja { border-left-color: var(--text-dim); }
+/* 0 puntos: son límites de la app ("no se pudo resolver el destino"), no acusaciones al
+   enlace, así que se pintan apagadas para que no se lean como una señal de peligro. */
+.flags li.sev-nota {
+  border-left-color: var(--border);
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.flags li.sev-ninguna {
+  border-left-color: var(--safe);
+  color: var(--text-dim);
+}
+
 .flags li.bad { border-left-color: var(--danger); }
 .flags li.warn { border-left-color: var(--warn); }
 .flags li.info { border-left-color: var(--text-dim); }
@@ -472,4 +656,88 @@ button.danger-btn {
   color: var(--accent);
   text-decoration: none;
   display: inline-block;
+}
+
+/* ---- Texto: frase llana delante, detalle técnico plegado ----
+   Los textos de cada herramienta eran exactos pero técnicos ("heurísticas de patrones,
+   typosquatting y homógrafos"). Quien abre la app con un SMS raro en la mano no necesita eso
+   para decidir; quien sí quiere saber qué se comprueba lo tiene a un toque. No se ha quitado
+   nada, solo se ha ordenado. */
+.hint.lead {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.detalle {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+.detalle > summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 5px 0;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.detalle > summary::-webkit-details-marker { display: none; }
+.detalle > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform 0.18s ease;
+}
+.detalle[open] > summary::before { transform: rotate(-135deg) translate(-2px, -2px); }
+.detalle > summary:hover { color: var(--text); }
+.detalle > p {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  line-height: 1.55;
+  border-left: 2px solid var(--border);
+  padding-left: 11px;
+}
+
+/* La etiqueta del interruptor dice el efecto arriba y la letra pequeña la consecuencia. */
+.toggle span { display: flex; flex-direction: column; gap: 2px; }
+.toggle span strong { font-size: 14px; font-weight: 600; color: var(--text); }
+.toggle span small { font-size: 12px; color: var(--text-dim); line-height: 1.35; }
+
+/* Una tarjeta impar dejaba un hueco a su lado que parecía un fallo de carga. */
+/* Una tarjeta impar dejaba un hueco a su lado que parecía un fallo de carga. Ocupando el
+   ancho, la retícula cierra sola y además da sitio a que la descripción quepa en una línea. */
+.tool-card.ancha {
+  grid-column: 1 / -1;
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+  flex-wrap: wrap;
+}
+.tool-card.ancha .tool-icon { margin-bottom: 0; }
+.tool-card.ancha .tool-label { flex-shrink: 0; }
+.tool-card.ancha .tool-desc { font-size: 12.5px; flex: 1 1 100%; }
+@media (min-width: 420px) {
+  .tool-card.ancha .tool-desc { flex: 1 1 auto; text-align: right; }
+}
+
+/* El aviso de "solo offline" es una advertencia sobre el alcance del análisis, no un hallazgo
+   sobre el enlace. Antes iba en amarillo intenso y pesaba tanto como el veredicto. */
+.offline-notice {
+  border-color: var(--border);
+  color: var(--text-dim);
+  background: var(--bg);
+}
+.offline-notice strong { color: var(--text); }
+.offline-notice .enable-net-btn {
+  border-color: var(--accent);
+  color: var(--accent);
 }

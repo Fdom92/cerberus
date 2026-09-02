@@ -30,6 +30,14 @@ Six of the thirteen tools never touch the network at all. Five more — URLs, QR
 
 History (IndexedDB, on-device only) records completed checks — except Password, JWT, and WebRTC, which touch identity/credential data and are never written to storage.
 
+## Interface
+
+The verdict is the part most people will read, so it says what to *do* — "No lo abras", "Desconfía de este mensaje" — rather than naming a category, and it never says "safe" in the sense of *is safe*: what it reports is that none of the signals it knows how to look for were found, which is a different claim. A ring gauge carries the magnitude, since a bare `60/100` means nothing to someone who does not work in this. Findings are sorted by weight and shaded by it, so "this domain is on Cloudflare's phishing list" (80 points) no longer looks identical to "the TLD is a cheap one" (15).
+
+Each tool leads with a plain-language sentence and folds the technical description into a "Qué comprueba exactamente" disclosure — nothing was removed, it was reordered.
+
+Icons are a hand-drawn inline SVG set rather than emoji, which every platform renders in its own style. There are no webfonts: pulling one from a CDN would contradict "everything runs on your device" and break offline use, so the type is a system stack.
+
 ## Architecture
 
 Vanilla HTML/CSS/JS, ES modules, zero dependencies, zero build step. `public/` is the entire deployable app:

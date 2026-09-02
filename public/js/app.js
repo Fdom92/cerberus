@@ -1,7 +1,7 @@
-import { checkUrl, FLAG_LABELS } from "./modules/urlModule.js";
+import { checkUrl, FLAG_LABELS, FLAG_POINTS } from "./modules/urlModule.js";
 import { checkFile, FILE_FLAG_LABELS } from "./modules/fileModule.js";
-import { checkMail, MAIL_FLAG_LABELS } from "./modules/mailModule.js";
-import { checkSms, SMS_FLAG_LABELS } from "./modules/smsModule.js";
+import { checkMail, MAIL_FLAG_LABELS, MAIL_FLAG_POINTS } from "./modules/mailModule.js";
+import { checkSms, SMS_FLAG_LABELS, SMS_FLAG_POINTS } from "./modules/smsModule.js";
 import { decodeJwt, JWT_FLAG_LABELS } from "./modules/jwtModule.js";
 import { estimatePassword, checkPwnedPassword, PASSWORD_FLAG_LABELS } from "./modules/passwordModule.js";
 import { decodeAll } from "./modules/decodeModule.js";
@@ -10,7 +10,7 @@ import { scanSecrets } from "./modules/secretsModule.js";
 import { checkApp } from "./modules/appsModule.js";
 import { checkWebRtcLeak, WEBRTC_FLAG_LABELS } from "./modules/webrtcModule.js";
 import { checkDns, DNS_FLAG_LABELS } from "./modules/dnsModule.js";
-import { checkQr, decodeQrFromBlob, qrSupported, QR_FLAG_LABELS } from "./modules/qrModule.js";
+import { checkQr, decodeQrFromBlob, qrSupported, QR_FLAG_LABELS, QR_FLAG_POINTS } from "./modules/qrModule.js";
 import { wireHistoryTab } from "./modules/historyModule.js";
 import { isNetEnabled, setNetPref, getStoredNetPref, withNetOnce } from "./netPref.js";
 import {
@@ -34,6 +34,23 @@ const ALL_FLAG_LABELS = {
   ...DNS_FLAG_LABELS,
   ...QR_FLAG_LABELS,
 };
+
+// Cuánto pesa cada señal, para poder ordenarlas y darles peso visual. Antes se pintaban todas
+// iguales: "el dominio está en las listas de phishing" (80 puntos) parecía tan importante como
+// "el TLD es de los baratos" (15), y la que de verdad importaba se perdía entre las demás.
+const ALL_FLAG_POINTS = {
+  ...FLAG_POINTS,
+  ...MAIL_FLAG_POINTS,
+  ...SMS_FLAG_POINTS,
+  ...QR_FLAG_POINTS,
+};
+
+function flagSeverity(flag) {
+  const puntos = ALL_FLAG_POINTS[flag];
+  if (puntos === undefined) return "media";
+  if (puntos === 0) return "nota";
+  return puntos >= 40 ? "alta" : puntos >= 20 ? "media" : "baja";
+}
 // Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
 // saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
 const APP_VERSION = "1.0.0";
@@ -44,9 +61,24 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function flagsHtml(flags, emptyText = "Sin señales de riesgo") {
-  if (!flags || flags.length === 0) return `<li class="info">${escapeHtml(emptyText)}</li>`;
-  return flags.map((f) => `<li class="warn">${escapeHtml(ALL_FLAG_LABELS[f] || f)}</li>`).join("");
+// Las señales van de más grave a menos, y las meramente informativas (0 puntos, como "no se
+// pudo resolver el destino") al final: son limitaciones de la app, no acusaciones al enlace.
+const ORDEN_SEVERIDAD = { alta: 0, media: 1, baja: 2, nota: 3 };
+
+// Los módulos que no publican una tabla de puntos (Archivos, JWT, DNS, WebRTC) tienen pocas
+// señales y su gravedad la lleva el veredicto del conjunto. En vez de mantener una segunda
+// tabla en la interfaz —que es justo lo que ya se ha desincronizado dos veces en este
+// proyecto— se hereda del veredicto, que es un dato que ya existe.
+function flagsHtml(flags, emptyText = "Sin señales de riesgo", verdictoBase = null) {
+  if (!flags || flags.length === 0) {
+    return `<li class="sev-ninguna">${escapeHtml(emptyText)}</li>`;
+  }
+  const porDefecto = verdictoBase === "dangerous" ? "alta" : verdictoBase === "safe" ? "baja" : "media";
+  const sevDe = (f) => (ALL_FLAG_POINTS[f] === undefined ? porDefecto : flagSeverity(f));
+  return [...flags]
+    .sort((a, b) => ORDEN_SEVERIDAD[sevDe(a)] - ORDEN_SEVERIDAD[sevDe(b)])
+    .map((f, i) => `<li class="sev-${sevDe(f)}" style="--i:${i}">${escapeHtml(ALL_FLAG_LABELS[f] || f)}</li>`)
+    .join("");
 }
 
 function wireSample(buttonId, inputEl, value, formEl) {
@@ -170,10 +202,9 @@ function renderUrlResult(el, r) {
   }
 
   el.innerHTML = `
-    <span class="verdict ${r.verdict}">${r.verdict}</span>
-    <div class="score">Riesgo: ${r.riskScore} / 100</div>
+    ${verdictBlock(r, "enlace")}
     ${chain}
-    <ul class="flags">${flagsHtml(r.flags)}</ul>
+    <ul class="flags">${flagsHtml(r.flags, undefined, r.verdict)}</ul>
     ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
     ${reputationNote(r.reputation)}
     ${previewNote(r.previewUrl)}
@@ -195,6 +226,89 @@ function previewNote(previewUrl) {
     </div>`;
 }
 
+// El veredicto es lo único que mucha gente va a leer, así que tiene que decir QUÉ HACER, no
+// en qué categoría cae. "SUSPICIOUS" en un aparato en español no significa nada para quien
+// acaba de recibir un SMS raro; "Desconfía" sí. La acción cambia según la herramienta: un
+// enlace no se abre, un mensaje no se responde, un archivo no se ejecuta.
+//
+// "safe" NUNCA dice "es seguro". La app no puede garantizarlo y no va a dar esa impresión:
+// dice que no ha encontrado señales, que es lo que de verdad sabe.
+// El matiz también depende de la herramienta: "señales claras de fraude" describe bien un SMS
+// de phishing y describe fatal una clave de API olvidada en el código, que no engaña a nadie
+// — simplemente no debería estar ahí.
+const ACCIONES = {
+  enlace: {
+    dangerous: ["No lo abras", "Hay señales claras de que este enlace no es lo que aparenta."],
+    suspicious: ["Desconfía de este enlace", "Hay señales que no encajan. No es prueba de fraude, pero merece una segunda mirada."],
+    safe: ["Sin señales de riesgo", "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía."],
+  },
+  mensaje: {
+    dangerous: ["No respondas ni pulses el enlace", "Tiene la forma de las campañas de fraude que circulan."],
+    suspicious: ["Desconfía de este mensaje", "Hay cosas que no encajan. No es prueba de estafa, pero ve con cuidado."],
+    safe: ["Sin señales de riesgo", "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía."],
+  },
+  archivo: {
+    dangerous: ["No lo abras ni lo ejecutes", "El archivo no es lo que su nombre dice, o pide cosas que no le corresponden."],
+    suspicious: ["Ten cuidado con este archivo", "Hay detalles que no cuadran del todo."],
+    safe: ["Sin señales de riesgo", "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía."],
+  },
+  hallazgo: {
+    dangerous: ["Hay que arreglar esto", "Se ha encontrado algo que no debería estar ahí o que expone información."],
+    suspicious: ["Merece un repaso", "Hay algo que conviene mirar, aunque puede ser intencionado."],
+    safe: ["Nada que señalar", "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía."],
+  },
+  generico: {
+    dangerous: ["Peligroso", "Se han encontrado señales serias."],
+    suspicious: ["Requiere atención", "Hay señales que no encajan."],
+    safe: ["Sin señales de riesgo", "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía."],
+  },
+};
+
+const SIN_DATOS = ["Sin datos suficientes", "No hay información bastante para pronunciarse."];
+
+// Se conserva para el bloque de WebRTC, que arma su propio titular.
+const MATIZ = {
+  dangerous: "Se han encontrado señales serias.",
+  suspicious: "Hay señales que no encajan.",
+  safe: "No se ha encontrado ninguna de las señales que sabe buscar. No es una garantía.",
+  unknown: "No hay información bastante para pronunciarse.",
+};
+
+// El anillo del medidor: un círculo SVG al que se le recorta el trazo. La circunferencia se
+// calcula aquí para no dejar un número mágico suelto en el CSS.
+const RADIO_MEDIDOR = 26;
+const VUELTA_MEDIDOR = 2 * Math.PI * RADIO_MEDIDOR;
+
+function riskGauge(score, verdict) {
+  // Un módulo sin puntuación no pinta medidor: enseñar un 0 al lado de "No lo abras" es
+  // contradecirse, y el usuario se queda sin saber a cuál de las dos cosas hacer caso.
+  if (!Number.isFinite(Number(score))) return "";
+  const pct = Math.max(0, Math.min(100, Number(score)));
+  const recorte = VUELTA_MEDIDOR * (1 - pct / 100);
+  return `
+    <svg class="gauge" viewBox="0 0 64 64" role="img" aria-label="Riesgo ${pct} sobre 100">
+      <circle class="gauge-track" cx="32" cy="32" r="${RADIO_MEDIDOR}"/>
+      <circle class="gauge-value ${verdict}" cx="32" cy="32" r="${RADIO_MEDIDOR}"
+              stroke-dasharray="${VUELTA_MEDIDOR.toFixed(1)}"
+              style="--vuelta:${VUELTA_MEDIDOR.toFixed(1)}; --recorte:${recorte.toFixed(1)}"/>
+      <text class="gauge-num" x="32" y="33" text-anchor="middle" dominant-baseline="middle">${pct}</text>
+    </svg>`;
+}
+
+function verdictBlock(r, contexto = "generico") {
+  const v = r.verdict || "unknown";
+  const acciones = ACCIONES[contexto] || ACCIONES.generico;
+  const [titulo, matiz] = acciones[v] || SIN_DATOS;
+  return `
+    <div class="verdict-block ${v}">
+      ${riskGauge(r.riskScore, v)}
+      <div class="verdict-text">
+        <strong>${escapeHtml(titulo)}</strong>
+        <span>${escapeHtml(matiz)}</span>
+      </div>
+    </div>`;
+}
+
 // Decir "safe" tras un análisis a medias es engañoso: si las comprobaciones de red están
 // apagadas no se ha mirado ninguna lista de amenazas, y el usuario no tiene forma de saberlo
 // (el interruptor queda arriba, fuera de vista, y está apagado por defecto). El aviso va
@@ -203,9 +317,8 @@ function offlineOnlyNotice() {
   if (isNetEnabled()) return "";
   return `
     <div class="netwarn offline-notice">
-      <span>Análisis <strong>solo offline</strong>: no se ha comprobado contra listas de amenazas, así que
-      este resultado no descarta que el enlace esté reportado como phishing. Para dejarlo activado
-      siempre está el interruptor de arriba.</span>
+      <span><strong>Falta media comprobación.</strong> Esto se ha mirado sin internet, así que no se sabe
+      si el enlace está denunciado como fraude. Un resultado limpio aquí no lo descarta.</span>
       <button type="button" class="sample-btn enable-net-btn">Comprobar también en red, solo esta vez</button>
     </div>`;
 }
@@ -276,12 +389,12 @@ function renderFileResult(el, r) {
     ? `<div class="meta mono">SHA-256: ${escapeHtml(r.sha256)}</div>`
     : `<div class="meta">SHA-256: omitido (archivo &gt;50MB)</div>`;
   el.innerHTML = `
-    <span class="verdict ${r.verdict}">${r.verdict}</span>
+    ${verdictBlock(r, "archivo")}
     <div class="score">${escapeHtml(r.input)} — ${(r.size / 1024).toFixed(1)} KB</div>
     <div class="meta">Extensión declarada: .${escapeHtml(r.declaredExt)} · Tipo detectado: ${escapeHtml(r.detected)}</div>
     <div class="meta">Entropía: ${r.entropy} / 8 bits/byte</div>
     ${hashLine}
-    <ul class="flags">${flagsHtml(r.flags)}</ul>
+    <ul class="flags">${flagsHtml(r.flags, undefined, r.verdict)}</ul>
   `;
 }
 
@@ -304,9 +417,8 @@ function initMailForm() {
       if (r.returnPathDomain) meta.push(`Return-Path: ${r.returnPathDomain}`);
       if (r.replyToDomain) meta.push(`Reply-To: ${r.replyToDomain}`);
       resultEl.innerHTML = `
-        <span class="verdict ${r.verdict}">${r.verdict}</span>
-        <div class="score">Riesgo: ${r.riskScore} / 100</div>
-        <ul class="flags">${flagsHtml(r.flags)}</ul>
+        ${verdictBlock(r, "mensaje")}
+        <ul class="flags">${flagsHtml(r.flags, undefined, r.verdict)}</ul>
         ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
         ${(r.bodyUrls || []).length ? offlineOnlyNotice() : ""}
       `;
@@ -341,9 +453,8 @@ function initSmsForm() {
         ? reputationNote("clean")
         : "";
       resultEl.innerHTML = `
-        <span class="verdict ${r.verdict}">${r.verdict}</span>
-        <div class="score">Riesgo: ${r.riskScore} / 100</div>
-        <ul class="flags">${flagsHtml(r.flags)}</ul>
+        ${verdictBlock(r, "mensaje")}
+        <ul class="flags">${flagsHtml(r.flags, undefined, r.verdict)}</ul>
         ${urlsHtml}
         ${repNote}
         ${r.urls.length ? offlineOnlyNotice() : ""}
@@ -374,9 +485,8 @@ function initDnsForm() {
       const r = await checkDns(raw);
       const meta = [`Dominio: ${r.domain}`, `MX: ${r.mxCount}`];
       resultEl.innerHTML = `
-        <span class="verdict ${r.verdict}">${r.verdict}</span>
-        <div class="score">Riesgo: ${r.riskScore} / 100</div>
-        <ul class="flags">${flagsHtml(r.flags)}</ul>
+        ${verdictBlock(r, "generico")}
+        <ul class="flags">${flagsHtml(r.flags, undefined, r.verdict)}</ul>
         <div class="meta">${meta.map(escapeHtml).join(" · ")}</div>
         ${r.spf ? `<div class="meta mono">SPF: ${escapeHtml(r.spf)}</div>` : ""}
         ${r.dmarc ? `<div class="meta mono">DMARC: ${escapeHtml(r.dmarc)}</div>` : ""}
@@ -524,8 +634,8 @@ function initSecretsTool() {
 
     if (findings.length === 0) {
       resultEl.innerHTML = `
-        <span class="verdict safe">safe</span>
-        <ul class="flags"><li class="info">No se detectaron patrones de secretos conocidos</li></ul>
+        ${verdictBlock({ verdict: "safe", riskScore: 0 }, "hallazgo")}
+        <ul class="flags"><li class="sev-ninguna">No se detectaron patrones de secretos conocidos</li></ul>
       `;
       return;
     }
@@ -540,8 +650,7 @@ function initSecretsTool() {
       .join("");
 
     resultEl.innerHTML = `
-      <span class="verdict ${verdict}">${verdict}</span>
-      <div class="score">Riesgo: ${riskScore} / 100</div>
+      ${verdictBlock({ verdict, riskScore }, "hallazgo")}
       <ul class="flags">${items}</ul>
     `;
   });
@@ -640,8 +749,7 @@ function renderQrResult(el, r) {
   }
 
   el.innerHTML = `
-    <span class="verdict ${r.verdict}">${r.verdict}</span>
-    <div class="score">Riesgo: ${r.riskScore} / 100</div>
+    ${verdictBlock(r, r.kind === "url" ? "enlace" : "generico")}
     <div class="chain"><strong>${escapeHtml(QR_KIND_LABELS[r.kind] || r.kind)}</strong></div>
     <div class="qr-payload">${escapeHtml(anidado?.finalUrl || r.detalle || r.input)}</div>
     ${
@@ -729,8 +837,7 @@ function initAppsTool() {
       const items = [...permItems, ...secretItems];
 
       resultEl.innerHTML = `
-        <span class="verdict ${r.verdict}">${r.verdict}</span>
-        <div class="score">Riesgo: ${r.riskScore} / 100</div>
+        ${verdictBlock(r, "archivo")}
         <div class="meta">${meta.map(escapeHtml).join(" · ")}</div>
         <ul class="flags">${items.length ? items.join("") : '<li class="info">Sin permisos peligrosos ni secretos detectados</li>'}</ul>
       `;
@@ -766,10 +873,20 @@ function initWebrtcTool() {
       meta.push(`IP local: ${r.localIps.length ? r.localIps.join(", ") : "ninguna detectada"}`);
       meta.push(`IP pública (STUN): ${r.stunIps.length ? r.stunIps.join(", ") : "ninguna detectada"}`);
       meta.push(`IP pública (HTTPS normal): ${r.publicIpViaHttps || "no disponible"}`);
-      const verdictLabel = r.verdict === "unknown" ? "sin datos suficientes" : r.verdict;
+      const FUGA = {
+        dangerous: "Tu IP real se está filtrando",
+        suspicious: "Posible filtración de tu IP",
+        safe: "No se ha detectado filtración",
+        unknown: "Sin datos suficientes",
+      };
       resultEl.innerHTML = `
-        <span class="verdict ${r.verdict}">${escapeHtml(verdictLabel)}</span>
-        <ul class="flags">${flagsHtml(r.flags, "Sin señales de fuga")}</ul>
+        <div class="verdict-block ${r.verdict}">
+          <div class="verdict-text">
+            <strong>${escapeHtml(FUGA[r.verdict] || "Sin veredicto")}</strong>
+            <span>${escapeHtml(MATIZ[r.verdict] || "")}</span>
+          </div>
+        </div>
+        <ul class="flags">${flagsHtml(r.flags, "Sin señales de fuga", r.verdict)}</ul>
         <div class="meta">${meta.map(escapeHtml).join(" · ")}</div>
       `;
     } catch (err) {
