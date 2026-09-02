@@ -120,9 +120,22 @@ Dos consecuencias:
    leerla (sin CORS), pero sí ofrecerla como enlace: el usuario aterriza en el acortador, no en el
    destino. Es la única forma honesta de dar la información sin backend.
 
-Para tener la cadena de saltos de verdad haría falta una función serverless propia (~20 líneas en
-Cloudflare Workers, gratis) que siga las redirecciones y devuelva los hops con CORS. Rompería el
-"sin backend", y por eso queda como decisión pendiente y no como algo hecho a medias.
+**Corrección posterior — sí se puede sin backend.** La conclusión anterior estaba mal por un error
+de método: las pruebas con `curl` no enviaban cabecera `Origin`, y varios proxies la exigen. Al
+repetirlas correctamente apareció **Microlink** (`api.microlink.io`): `access-control-allow-origin: *`,
+sin registro, y devuelve `data.url` con el destino ya resuelto tras seguir todas las redirecciones.
+Límite medido: **25 consultas al día por IP** — de sobra para uso personal.
+
+Así que el destino final **sí se muestra**, sin servidor propio:
+`https://tinyurl.com/2p8s7hfa → https://docs.google.com/gview?...`
+
+Y lo más importante: **las heurísticas se vuelven a aplicar sobre el destino resuelto**. Un `bit.ly`
+que apunta a `bbva-clientes-acceso.com` pasaba limpio (bit.ly no tiene nada sospechoso) y ahora
+hereda `brand_in_hostname` del destino.
+
+Lo único que sigue necesitando backend es el detalle **salto a salto** (los servicios que lo dan,
+`unshorten.me` y `redirect-checker.net`, no mandan CORS). Es lo de menos: para decidir si abrir un
+enlace, lo que importa es dónde acaba.
 
 ## Reputación: de heurística a dato contrastado (`js/reputation.js`)
 Hasta aquí todo eran heurísticas: se juzgaba **la forma** del enlace. Esto añade lo otro — saber si

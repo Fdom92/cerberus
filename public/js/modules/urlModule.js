@@ -22,6 +22,7 @@ const FLAG_POINTS = {
   excess_subdomains: 15,
   domain_new: 40,
   resolve_failed: 0,
+  resolve_rate_limited: 0,
   domain_age_unknown: 0,
 };
 
@@ -40,6 +41,7 @@ const FLAG_LABELS = {
   suspicious_tld: "Dominio de nivel superior muy usado en campañas de phishing (barato, sin verificación)",
   excess_subdomains: "Demasiados guiones o subdominios — patrón típico de phishing",
   domain_new: "Dominio registrado hace menos de 30 días",
+  resolve_rate_limited: "Se ha alcanzado el límite diario de consultas del servicio que resuelve enlaces (25 al día). Vuelve a intentarlo mañana o usa la vista previa del acortador",
   resolve_failed: "No se pudo averiguar el destino final. Es una limitación de esta app (funciona sin servidor propio y depende de proxies públicos poco fiables), no una señal sobre el enlace",
   domain_age_unknown: "No se pudo determinar la edad del dominio",
 };
@@ -268,6 +270,28 @@ async function fetchWithTimeout(url, ms) {
   }
 }
 
+// Resolver el destino de un enlace acortado desde el navegador parecía imposible: los proxies
+// CORS públicos están caídos (allorigins devuelve 522), limitados (429) o piden clave, y los dos
+// servicios que dan la cadena completa (unshorten.me, redirect-checker.net) no mandan cabeceras
+// CORS. Microlink sí: `access-control-allow-origin: *`, sin registro, y devuelve `data.url`
+// con el destino ya resuelto tras seguir todas las redirecciones.
+//
+// Límite comprobado: 25 consultas al día por IP. De sobra para uso personal (nadie comprueba
+// 25 enlaces sospechosos al día), pero hay que tratar el 429 con un mensaje claro.
+//
+// Lo que NO da es el detalle salto a salto: para eso sí haría falta un backend propio. El
+// destino final, que es lo que de verdad importa para decidir si abrir un enlace, sí.
+async function viaMicrolink(url) {
+  const endpoint = `https://api.microlink.io/?url=${encodeURIComponent(url)}&meta=false&insights=false`;
+  const res = await fetchWithTimeout(endpoint, 12000);
+  if (res.status === 429) throw new Error("rate_limited");
+  if (!res.ok) throw new Error("bad_status");
+  const data = await res.json();
+  const finalUrl = data?.data?.url;
+  if (!finalUrl) throw new Error("no_url");
+  return { finalUrl, httpCode: null };
+}
+
 async function viaAllorigins(url) {
   const res = await fetchWithTimeout("https://api.allorigins.win/get?url=" + encodeURIComponent(url), 6000);
   const data = await res.json();
@@ -276,22 +300,17 @@ async function viaAllorigins(url) {
   return { finalUrl, httpCode: data?.status?.http_code ?? null };
 }
 
-async function viaCorsproxy(url) {
-  const res = await fetchWithTimeout("https://corsproxy.io/?url=" + encodeURIComponent(url), 6000);
-  if (!res.ok) throw new Error("bad-status");
-  return { finalUrl: res.url && res.url !== url ? res.url : null, httpCode: res.status };
-}
-
 async function resolveDestination(url) {
-  for (const attempt of [viaAllorigins, viaCorsproxy]) {
+  let rateLimited = false;
+  for (const attempt of [viaMicrolink, viaAllorigins]) {
     try {
       const result = await attempt(url);
-      if (result.finalUrl) return result;
-    } catch {
-      // try next proxy
+      if (result.finalUrl) return { ...result, rateLimited: false };
+    } catch (e) {
+      if (e.message === "rate_limited") rateLimited = true;
     }
   }
-  return null;
+  return { finalUrl: null, httpCode: null, rateLimited };
 }
 
 async function domainAge(hostname) {
@@ -327,14 +346,29 @@ export async function checkUrl(rawInput, { networkEnabled }) {
   let httpCode = null;
   let ageDays = null;
   let reputation = null;
+  let rateLimited = false;
 
   if (networkEnabled) {
     const resolved = await resolveDestination(url.href);
-    if (resolved) {
-      finalUrl = resolved.finalUrl;
-      httpCode = resolved.httpCode;
-    } else {
-      flags.push("resolve_failed");
+    finalUrl = resolved.finalUrl;
+    httpCode = resolved.httpCode;
+    rateLimited = resolved.rateLimited;
+    if (!finalUrl) flags.push(rateLimited ? "resolve_rate_limited" : "resolve_failed");
+
+    // Lo importante de un acortador es a DÓNDE lleva: las heurísticas se vuelven a aplicar
+    // sobre el destino resuelto. Si no, un bit.ly que apunta a un dominio de phishing salía
+    // limpio, porque bit.ly en sí no tiene nada sospechoso.
+    if (finalUrl) {
+      try {
+        const destino = parseUrl(finalUrl);
+        if (destino.hostname !== url.hostname) {
+          for (const f of offlineHeuristics(destino, knownDomains)) {
+            if (!flags.includes(f)) flags.push(f);
+          }
+        }
+      } catch {
+        /* destino no parseable */
+      }
     }
 
     const targetHost = (finalUrl ? (() => { try { return new URL(finalUrl).hostname; } catch { return url.hostname; } })() : url.hostname);
@@ -356,6 +390,7 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     httpCode,
     ageDays,
     reputation,
+    rateLimited,
     previewUrl: shortenerPreviewUrl(url.href),
     flags,
     riskScore,

@@ -131,7 +131,7 @@
       <span>Activar comprobaciones de red (destino final, antigüedad del dominio y listas de amenazas)</span>
     </label>
     <p class="netwarn net-warn" hidden>
-      Al activarlo, el dominio se consulta contra las listas de phishing y malware de <strong>Cloudflare</strong>, y se usan un proxy CORS público (allorigins.win) y RDAP (rdap.org) para resolver el destino. No se envía nada más de tu dispositivo.
+      Al activarlo: el dominio se consulta contra las listas de phishing y malware de <strong>Cloudflare</strong>; la URL se envía a <strong>api.microlink.io</strong> para averiguar a dónde lleva de verdad (25 consultas al día); y se usa RDAP para la antigüedad del dominio. No se envía nada más de tu dispositivo.
     </p>
 
     <div id="urlResult" class="result" hidden></div>
