@@ -35,6 +35,10 @@ const ALL_FLAG_LABELS = {
 };
 const NET_PREF_KEY = "cerberus_net_enabled";
 
+// Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
+// saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
+const APP_VERSION = "1.0.0";
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
@@ -844,6 +848,11 @@ initJwtTool();
 initPasswordTool();
 initDecodeTool();
 initSecretsTool();
+// El pie lleva la versión escrita a mano como respaldo por si esto no llega a ejecutarse;
+// la constante manda, para que no acaben diciendo cosas distintas.
+const versionEl = document.getElementById("appVersion");
+if (versionEl) versionEl.textContent = `v${APP_VERSION}`;
+
 initQrTool();
 initExifTool();
 initAppsTool();
