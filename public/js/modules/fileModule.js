@@ -1,5 +1,6 @@
 import { detectSignature, readHeader, extOf, sha256Hex, shannonEntropy, readEntropySample } from "../magicBytes.js";
 import { saveResult } from "../db.js";
+import { listZipEntries } from "../zipReader.js";
 
 const HASH_SIZE_LIMIT = 50 * 1024 * 1024; // 50MB — evita bloquear el hilo en móvil con archivos enormes
 const HIGH_ENTROPY_THRESHOLD = 7.5; // bits/byte, de 8 máx — típico de datos empaquetados/cifrados
@@ -31,12 +32,14 @@ function doubleExtensionFlag(filename) {
 }
 
 export async function checkFile(file) {
-  const bytes = await readHeader(file);
+  // 34 KB: suficiente para llegar al descriptor ISO en 0x8001 sin leer el fichero entero.
+  const bytes = await readHeader(file, 34000);
   const sig = detectSignature(bytes);
   const declaredExt = extOf(file.name);
 
   const flags = [];
   let verdict = "safe";
+  let result_zipDanger = [];
 
   if (!sig) {
     flags.push("unknown_signature");
@@ -67,6 +70,46 @@ export async function checkFile(file) {
     }
   }
 
+  // El ZIP en sí nunca es "el malware": lo es lo que lleva dentro. Un "Presupuesto.pdf.zip"
+  // con un .exe dentro pasaba limpio porque el contenedor es un ZIP legítimo.
+  let zipEntries = null;
+  if (sig?.mime === "application/zip" && file.size < 30 * 1024 * 1024) {
+    try {
+      const names = [...listZipEntries(await file.arrayBuffer()).keys()];
+      zipEntries = names;
+      const peligrosos = names.filter((n) => EXECUTABLE_EXTS.has(extOf(n)));
+      const conDobleExt = names.filter((n) => doubleExtensionFlag(n));
+      if (peligrosos.length > 0 || conDobleExt.length > 0) {
+        flags.push("archive_contains_executable");
+        verdict = "dangerous";
+        result_zipDanger = [...new Set([...peligrosos, ...conDobleExt])];
+      }
+    } catch {
+      /* ZIP cifrado o malformado: no se puede mirar dentro */
+    }
+  }
+
+  // ISO/IMG: contenedor legítimo, pero hoy se usa sobre todo para entregar malware porque
+  // lo que va dentro no hereda la marca de "descargado de internet" y Windows no avisa.
+  // Se marca sospechoso, no peligroso: quien se baja una ISO de Linux verá el aviso y sabrá
+  // que no le aplica; quien la recibe por correo tiene justo la advertencia que necesita.
+  if (sig?.mime === "application/x-iso9660-image") {
+    flags.push("disk_image_delivery");
+    if (verdict === "safe") verdict = "suspicious";
+  }
+
+  // HTML smuggling: un .html que trae dentro un ejecutable en base64 y lo reconstruye con
+  // JavaScript. Para el navegador es "solo una página", y así se salta los filtros de correo.
+  if (!sig && /\.html?$/i.test(file.name)) {
+    const texto = new TextDecoder("utf-8", { fatal: false }).decode(bytes.subarray(0, 8000));
+    const tieneScript = /<script/i.test(texto);
+    const reconstruye = /atob\s*\(|base64,|Uint8Array|msSaveOrOpenBlob|createObjectURL/i.test(texto);
+    if (tieneScript && reconstruye) {
+      flags.push("html_smuggling");
+      verdict = "dangerous";
+    }
+  }
+
   const entropySample = await readEntropySample(file);
   const entropy = shannonEntropy(entropySample);
   // La entropía alta por sí sola NO es peligrosa: prácticamente todo instalador legítimo
@@ -87,6 +130,8 @@ export async function checkFile(file) {
     detected: sig ? sig.name : "Desconocido",
     executable: sig ? sig.executable : false,
     entropy: Math.round(entropy * 100) / 100,
+    zipEntries,
+    zipDangerous: result_zipDanger,
     sha256: hash,
     flags,
     verdict,
@@ -113,5 +158,8 @@ export const FILE_FLAG_LABELS = {
   double_extension: "Doble extensión: el nombre aparenta ser un documento pero termina en una extensión que ejecuta código — disfraz clásico de malware",
   is_executable: "Este archivo ejecuta código al abrirlo. Ábrelo solo si sabes con certeza de dónde viene",
   executable_no_extension: "Es un ejecutable sin extensión: por el nombre no hay forma de saber que lo es",
+  disk_image_delivery: "Imagen de disco (ISO/IMG). Es un formato legítimo, pero se usa mucho para colar malware: lo que va dentro se salta el aviso de Windows de 'archivo descargado de internet'. Si te ha llegado por correo o mensaje, no lo abras",
+  html_smuggling: "Página HTML que reconstruye un archivo ejecutable con JavaScript. Es la técnica de 'HTML smuggling': parece una página inofensiva y así evita los filtros de correo",
+  archive_contains_executable: "El comprimido contiene un archivo que ejecuta código. El ZIP en sí es inofensivo; lo que lleva dentro no",
   packed_executable: "Ejecutable comprimido o empaquetado. Es lo normal en instaladores, pero también se usa para evadir antivirus — dato informativo, no una alerta por sí solo",
 };

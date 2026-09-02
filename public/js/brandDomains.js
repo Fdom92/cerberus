@@ -28,4 +28,33 @@ export const BRAND_DOMAINS = {
   facebook: ["facebook.com"],
   instagram: ["instagram.com"],
   whatsapp: ["whatsapp.com"],
+
+  // Añadidas tras probar campañas reales: sin ellas, phishing muy extendido en España
+  // (Bizum, eléctricas, operadoras) no dejaba ninguna señal de suplantación.
+  bizum: ["bizum.es"],
+  endesa: ["endesa.com", "endesa.es"],
+  iberdrola: ["iberdrola.es", "iberdrola.com"],
+  naturgy: ["naturgy.es", "naturgy.com"],
+  repsol: ["repsol.com", "repsol.es"],
+  movistar: ["movistar.es", "telefonica.com"],
+  vodafone: ["vodafone.es", "vodafone.com"],
+  orange: ["orange.es"],
+  sabadell: ["bancsabadell.com", "sabadell.com"],
+  bankinter: ["bankinter.com", "bankinter.es"],
+  openbank: ["openbank.es"],
+  unicaja: ["unicaja.es", "unicajabanco.es"],
+  ibercaja: ["ibercaja.es"],
+  abanca: ["abanca.com"],
+  mapfre: ["mapfre.es", "mapfre.com"],
+  iberia: ["iberia.com"],
+  renfe: ["renfe.com", "renfe.es"],
+  glovo: ["glovoapp.com"],
+  wallapop: ["wallapop.com"],
+  vinted: ["vinted.es", "vinted.com"],
+  "el corte ingles": ["elcorteingles.es"],
+
+  // Siglas por las que se conocen las administraciones: el phishing las usa tal cual
+  // ("aeat-devoluciones", "sede-inss") y por el nombre completo no se detectaban.
+  aeat: ["agenciatributaria.gob.es", "agenciatributaria.es"],
+  inss: ["seg-social.es", "seg-social.gob.es"],
 };

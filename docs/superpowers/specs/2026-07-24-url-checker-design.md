@@ -63,6 +63,67 @@ Sin build step ni framework: `tests/index.html` carga `tests/run.js` (módulo ES
 ### Archivos — ampliado
 `fileModule.js` ahora además de magic bytes calcula: SHA-256 completo (`crypto.subtle.digest`, omitido si el archivo supera 50MB para no bloquear el hilo en móvil) y entropía de Shannon sobre los primeros 256KB — entropía >7.5 bits/byte en un ejecutable se flagea como `high_entropy_executable` (indicio de empaquetado/cifrado, técnica común para evadir firmas).
 
+## Red team con campañas reales — de 9 coladas a 2
+Última pasada, y la más realista: en vez de evasiones sintéticas de heurísticas sueltas,
+**30 campañas completas tal y como llegan en España** (`tests/campaign-audit.html`), probadas en el
+estado **por defecto** (red apagada), que es como la va a tener casi todo el mundo. En la primera
+pasada **9 de 30 salían `safe`**, todas ellas campañas que circulan ahora mismo.
+
+Lo que faltaba, por orden de impacto:
+
+- **Marcas españolas ausentes.** Bizum, Endesa, Iberdrola, Movistar, Vodafone, Sabadell, Bankinter,
+  MAPFRE, Renfe, Wallapop… El phishing de Bizum y el de las eléctricas es de los más extendidos y no
+  dejaba ninguna señal. Añadidas ~25 marcas, más las **siglas** (`aeat`, `inss`) que es como las
+  escriben los dominios de phishing.
+- **La estafa del "hijo en apuros"** ("hola mamá, se me ha roto el móvil, este es mi número nuevo").
+  Probablemente la estafa más extendida hoy en España, y no tenía absolutamente nada que la
+  detectase: sin enlace, sin marca, sin urgencia clásica. Heurística propia con tres señales
+  (familiar + número nuevo + petición de dinero), de las que bastan dos.
+- **Enlace directo a un ejecutable** (`.../factura.pdf.exe`). Cazó el correo de "factura de
+  proveedor" que pasaba con 0 puntos. Ojo con la lista: incluir `js` y `com` provocó 3 falsos
+  positivos inmediatos (toda web carga `.js`, y una query que acaba en un email termina en `.com`).
+- **El asunto no entraba en las heurísticas de texto**, y ahí es donde el fraude del CEO pone
+  "Acción requerida". Añadido también `credential_request` para correo ("actualice sus datos
+  bancarios"), que es la carga útil típica.
+- **Marca pegada a otras palabras** (`sedeseg-social.online`): el token exacto no aparecía. Ahora se
+  busca como subcadena, pero **solo en etiquetas con guión**, para que `amazonas.com` no salte.
+- **Ejecutable dentro de un ZIP.** El contenedor es un ZIP legítimo, así que pasaba limpio; lo
+  peligroso es lo que lleva dentro. Se listan las entradas con `zipReader` y se marcan las
+  ejecutables.
+- **ISO/IMG**: formato de entrega de malware muy usado porque su contenido se salta el aviso de
+  Windows de "archivo descargado de internet". Se marca sospechoso con un mensaje que distingue el
+  caso legítimo (bajarse una ISO de Linux) del peligroso (recibirla por correo).
+- **HTML smuggling**: un `.html` que reconstruye un ejecutable con JavaScript para saltarse los
+  filtros de correo. Se detecta por contenido (`<script>` + `atob`/`base64`/`Uint8Array`).
+
+**Lo que sigue pasando (2 de 30), y por qué:**
+- *Servicio legítimo abusado* (`firebasestorage.googleapis.com/...`): es un dominio real de Google.
+  Marcarlo implicaría marcar medio internet.
+- *Acortador a secas*: 20 puntos, por debajo del umbral. La respuesta útil aquí no es el veredicto
+  sino la vista previa (abajo).
+
+## Acortadores: por qué no se resuelve la cadena, y qué se hace en su lugar
+Un usuario reportó que la resolución del destino final **siempre daba timeout**. Comprobado, y era
+peor de lo que parecía: `api.allorigins.win` devuelve **522** (su origen caído), el Worker público de
+CORS **429**, `cors.lol` **429**, y los dos servicios que sí dan la cadena completa
+(`unshorten.me`, `redirect-checker.net`) **no envían cabeceras CORS**, así que el navegador los
+bloquea. **No existe hoy un proxy CORS gratuito fiable**: seguir redirecciones desde una app sin
+servidor propio no es viable.
+
+Dos consecuencias:
+1. **`resolve_failed` deja de puntuar (10 → 0).** Que *nuestro* proxy se caiga no dice absolutamente
+   nada sobre el enlace, y estaba sumando puntos a cualquier URL analizada. El mensaje ahora explica
+   que es una limitación de la app, no una señal.
+2. **Vista previa oficial del acortador.** Avisar de "esto es un acortador" sin decir a dónde lleva
+   no le sirve a nadie. Los propios servicios exponen una página de vista previa
+   (`bit.ly/xxx+`, `preview.tinyurl.com/xxx`) que muestra el destino **sin seguirlo**. No podemos
+   leerla (sin CORS), pero sí ofrecerla como enlace: el usuario aterriza en el acortador, no en el
+   destino. Es la única forma honesta de dar la información sin backend.
+
+Para tener la cadena de saltos de verdad haría falta una función serverless propia (~20 líneas en
+Cloudflare Workers, gratis) que siga las redirecciones y devuelva los hops con CORS. Rompería el
+"sin backend", y por eso queda como decisión pendiente y no como algo hecho a medias.
+
 ## Reputación: de heurística a dato contrastado (`js/reputation.js`)
 Hasta aquí todo eran heurísticas: se juzgaba **la forma** del enlace. Esto añade lo otro — saber si
 **ese dominio concreto** está reportado como malicioso — que es el único salto real hacia un

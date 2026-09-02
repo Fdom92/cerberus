@@ -160,8 +160,23 @@ function renderUrlResult(el, r) {
     <ul class="flags">${flagsHtml(r.flags)}</ul>
     ${meta.length ? `<div class="meta">${meta.map(escapeHtml).join(" · ")}</div>` : ""}
     ${reputationNote(r.reputation)}
+    ${previewNote(r.previewUrl)}
     ${offlineOnlyNotice()}
   `;
+}
+
+// Un acortador oculta el destino y esta app, al no tener servidor propio, no puede seguir la
+// redirección de forma fiable (los proxies CORS públicos están caídos o limitados). Lo que sí
+// se puede hacer es dar la vista previa OFICIAL del acortador: enseña a dónde lleva sin ir.
+function previewNote(previewUrl) {
+  if (!previewUrl) return "";
+  return `
+    <div class="netwarn preview-note">
+      <span>Este enlace es un acortador. Puedes ver a dónde lleva <strong>sin abrirlo</strong>
+      con la vista previa del propio servicio:</span>
+      <a href="${escapeHtml(previewUrl)}" target="_blank" rel="noopener noreferrer nofollow"
+         class="sample-btn">Ver el destino sin abrir el enlace →</a>
+    </div>`;
 }
 
 // Decir "safe" tras un análisis a medias es engañoso: si las comprobaciones de red están

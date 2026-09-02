@@ -1,7 +1,7 @@
 import { test, assert, assertEqual, runAll } from "./harness.js";
 import { buildTestJpeg, buildTestZip, buildTestAxml, buildTestBinaryPlist } from "./fixtures.js";
 
-import { checkUrl, offlineUrlFlags } from "../public/js/modules/urlModule.js";
+import { checkUrl, offlineUrlFlags, shortenerPreviewUrl } from "../public/js/modules/urlModule.js";
 import { checkFile } from "../public/js/modules/fileModule.js";
 import { checkMail } from "../public/js/modules/mailModule.js";
 import { checkSms } from "../public/js/modules/smsModule.js";
@@ -143,6 +143,77 @@ test("secretsModule: una clave real no se descarta por contener 'YOUR'", () => {
 test("secretsModule: clave escondida en base64 se detecta", () => {
   const r = scanSecrets('const k = atob("QUtJQUlPU0ZPRE5ON1JFQUxLRVk5OQ==");');
   assert(r.findings.some((f) => f.name.includes("base64")));
+});
+
+// --- Campañas reales (ver tests/campaign-audit.html) ---
+
+test("smsModule: estafa del 'hijo en apuros' se detecta sin enlace ni marca", async () => {
+  const r = await checkSms("Hola mama, se me ha roto el movil y este es mi numero nuevo. Necesito que me hagas un pago urgente.");
+  assert(r.flags.includes("family_impersonation"));
+  assert(r.verdict !== "safe");
+});
+
+test("smsModule: marcas españolas frecuentes en phishing se reconocen", async () => {
+  for (const [texto, marca] of [
+    ["Has recibido un Bizum de 50 EUR. Acepta en https://bizum-cobros.top/aceptar", "Bizum"],
+    ["ENDESA: factura impagada, abone en https://endesa-pagos.icu/factura", "Endesa"],
+  ]) {
+    const r = await checkSms(texto);
+    assertEqual(r.verdict, "dangerous", `debería detectarse la suplantación de ${marca}`);
+  }
+});
+
+test("mailModule: el asunto entra en las heurísticas de texto (fraude del CEO)", async () => {
+  const r = await checkMail(
+    "From: Direccion <direccion@empresa-nomina.info>\nSubject: Accion requerida: actualizacion de datos bancarios\n" +
+      "Return-Path: direccion@empresa-nomina.info\nAuthentication-Results: mx; spf=pass; dkim=pass; dmarc=pass\n\n" +
+      "Necesitamos que actualice sus datos bancarios en https://empresa-nomina.info/rrhh"
+  );
+  assert(r.flags.includes("official_notice_language"), "'Accion requerida' va en el asunto");
+  assert(r.flags.includes("credential_request"));
+  assert(r.verdict !== "safe");
+});
+
+test("urlModule: enlace directo a un ejecutable se marca", async () => {
+  const r = await checkUrl("https://grupo-suministros.info/factura.pdf.exe", { networkEnabled: false });
+  assert(r.flags.includes("executable_link"));
+});
+
+test("urlModule: rutas web normales no se confunden con ejecutables", async () => {
+  // .js lo carga toda web, y una query que acaba en un correo termina en ".com"
+  for (const u of ["https://cdn.jsdelivr.net/npm/x/dist/index.js", "https://example.com/c?email=juan@example.com"]) {
+    const r = await checkUrl(u, { networkEnabled: false });
+    assert(!r.flags.includes("executable_link"), `no debería marcarse: ${u}`);
+  }
+});
+
+test("urlModule: homógrafo con tilde de una marca conocida (córreos.es)", async () => {
+  const r = await checkUrl("https://xn--crreos-bxa.es/envio", { networkEnabled: false });
+  assert(r.flags.includes("homograph"), "sin tildes es exactamente correos.es");
+});
+
+test("urlModule: los acortadores ofrecen vista previa oficial", () => {
+  assert(shortenerPreviewUrl("https://bit.ly/abc") === "https://bit.ly/abc+");
+  assert(shortenerPreviewUrl("https://tinyurl.com/abc").startsWith("https://preview.tinyurl.com/"));
+  assertEqual(shortenerPreviewUrl("https://example.com/abc"), null);
+});
+
+test("fileModule: ejecutable dentro de un ZIP se detecta", async () => {
+  const u16 = (n) => [n & 0xff, (n >> 8) & 0xff];
+  const u32 = (n) => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >> 24) & 0xff];
+  const name = new TextEncoder().encode("Presupuesto.pdf.exe");
+  const data = new Uint8Array([0x4d, 0x5a, ...new Array(50).fill(0)]);
+  const local = [...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+    ...u32(0), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...name, ...data];
+  const central = [...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+    ...u32(0), ...u32(data.length), ...u32(data.length), ...u16(name.length),
+    ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(0), ...name];
+  const eocd = [...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(1), ...u16(1),
+    ...u32(central.length), ...u32(local.length), ...u16(0)];
+  const zip = new Uint8Array([...local, ...central, ...eocd]);
+  const r = await checkFile(new File([zip], "Presupuesto.zip"));
+  assert(r.flags.includes("archive_contains_executable"));
+  assertEqual(r.verdict, "dangerous");
 });
 
 test("urlModule: un TLD abusado por sí solo no basta para sospechar", async () => {

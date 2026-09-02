@@ -71,6 +71,8 @@ python3 -m http.server 8080
 
 Open `http://localhost:8080/tests/index.html`. Pass/fail renders on the page and logs to the console.
 
+A fifth suite at `tests/campaign-audit.html` runs 30 complete, realistic phishing campaigns as they actually arrive in Spain (Correos customs fees, bank account suspensions, DGT fines, fake Bizum transfers, the "hi mum, this is my new number" scam, CEO fraud, malware in ZIPs and ISOs), tested in the **default** configuration with network checks off. The first run had 9 of 30 coming back clean.
+
 A fourth suite at `tests/evasion-audit.html` is the red team: 27 real attacks built specifically to slip past each heuristic (brand as a subdomain of the attacker's domain, double extensions, zero-width characters inside keywords, a brand named only in the Subject). The first run had 18 of 27 coming back clean; three remain, each documented as a deliberate limit rather than an oversight.
 
 A third suite at `tests/hostile-audit.html` throws XSS payloads, malformed input, empty files and a tampered APK at every module, and checks two things: that nothing injects into the DOM, and that nothing throws an internal browser error into the UI.

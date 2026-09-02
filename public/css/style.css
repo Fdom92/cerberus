@@ -445,3 +445,18 @@ button.danger-btn {
   border-color: var(--warn);
   color: var(--warn);
 }
+
+.preview-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+.preview-note a {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+  display: inline-block;
+}

@@ -1,5 +1,5 @@
 import { saveResult } from "../db.js";
-import { analyzeHostnameScripts } from "../punycode.js";
+import { analyzeHostnameScripts, punycodeToUnicode } from "../punycode.js";
 import { BRAND_DOMAINS } from "../brandDomains.js";
 import { checkDomainReputation } from "../reputation.js";
 
@@ -9,6 +9,8 @@ const FLAG_POINTS = {
   threat_intel_blocked: 80,
   homograph: 50,
   typosquat: 50,
+  executable_link: 55,
+  shortened_url: 20,
   brand_subdomain_spoof: 50,
   brand_in_hostname: 35,
   ip_literal: 40,
@@ -19,13 +21,15 @@ const FLAG_POINTS = {
   suspicious_tld: 15,
   excess_subdomains: 15,
   domain_new: 40,
-  resolve_failed: 10,
+  resolve_failed: 0,
   domain_age_unknown: 0,
 };
 
 const FLAG_LABELS = {
   threat_intel_blocked:
     "Este dominio está en las listas de phishing/malware de Cloudflare. No es una sospecha por la forma del enlace: está reportado como malicioso. No lo abras",
+  executable_link: "El enlace apunta directamente a un archivo que ejecuta código al abrirlo",
+  shortened_url: "Es un enlace acortado: oculta a dónde lleva de verdad, y sin abrirlo no hay forma de saberlo",
   homograph: "El dominio usa caracteres que imitan letras latinas — posible homógrafo",
   typosquat: "Muy parecido a un dominio conocido — posible typosquatting",
   brand_subdomain_spoof: "El dominio real no es el de la marca: la marca aparece solo como subdominio, y lo que manda es lo que va justo antes del .com/.es final",
@@ -36,7 +40,7 @@ const FLAG_LABELS = {
   suspicious_tld: "Dominio de nivel superior muy usado en campañas de phishing (barato, sin verificación)",
   excess_subdomains: "Demasiados guiones o subdominios — patrón típico de phishing",
   domain_new: "Dominio registrado hace menos de 30 días",
-  resolve_failed: "No se pudo resolver el destino final (timeout o bloqueo)",
+  resolve_failed: "No se pudo averiguar el destino final. Es una limitación de esta app (funciona sin servidor propio y depende de proxies públicos poco fiables), no una señal sobre el enlace",
   domain_age_unknown: "No se pudo determinar la edad del dominio",
 };
 
@@ -48,6 +52,43 @@ const SUSPICIOUS_TLDS = new Set([
   "gdn", "kim", "loan", "men", "party", "review", "science", "trade", "win", "date",
   "faith", "accountant", "bar", "cam", "buzz", "rocks", "cc",
 ]);
+
+// Acortadores: ocultan el destino. La lista vivía solo en smsModule, así que analizar el
+// mismo enlace en el módulo de URLs no decía nada.
+const SHORTENERS = new Set([
+  "bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly", "buff.ly", "rebrand.ly",
+  "cutt.ly", "bit.do", "tiny.cc", "shorturl.at", "s.id", "rb.gy", "v.gd", "tr.im",
+  "shrtco.de", "x.co", "acortar.link",
+]);
+
+// Página de vista previa OFICIAL de cada acortador: muestra a dónde lleva sin seguir el
+// enlace. No podemos leerla nosotros (no tiene CORS), pero sí dársela al usuario para que
+// la abra: aterriza en el propio acortador, no en el destino. Avisar de "esto es un
+// acortador" sin ofrecer esto no le sirve de nada a nadie.
+const SHORTENER_PREVIEW = {
+  "bit.ly": (u) => `${u.origin}${u.pathname}+`,
+  "tinyurl.com": (u) => `https://preview.tinyurl.com${u.pathname}`,
+  "is.gd": (u) => `https://is.gd/preview.php?url=${encodeURIComponent(u.href)}`,
+  "v.gd": (u) => `https://v.gd/preview.php?url=${encodeURIComponent(u.href)}`,
+  "ow.ly": (u) => `${u.origin}${u.pathname}+`,
+  "cutt.ly": (u) => `${u.origin}${u.pathname}+`,
+};
+
+export function shortenerPreviewUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.replace(/^www\./, "");
+    return SHORTENER_PREVIEW[host] ? SHORTENER_PREVIEW[host](u) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Extensiones que ejecutan código: un enlace que apunta directamente a una de ellas es
+// descarga de malware, no una página. Cazó el correo de "factura adjunta" que pasaba limpio.
+// Sin 'js' ni 'com': todas las webs cargan .js, y cualquier query que acabe en un correo
+// ("?email=juan@example.com") termina en ".com". Ambos daban falsos positivos.
+const EXECUTABLE_URL_EXT = /\.(exe|scr|pif|bat|cmd|msi|msp|vbs|vbe|wsf|ps1|jar|apk|hta|cpl|lnk|iso|img|dmg)($|[?#])/i;
 
 let knownDomainsCache = null;
 async function getKnownDomains() {
@@ -119,7 +160,17 @@ function brandImpersonationFlags(host) {
     // Se exige token exacto (separado por . o -) para no marcar "amazonas.com" por "amazon".
     const tokens = brandTokens(brand);
     const hostTokens = host.split(/[.-]/);
-    const brandTokenPresent = [...tokens].some((t) => hostTokens.includes(t) || host.split(".").includes(t));
+    let brandTokenPresent = [...tokens].some((t) => hostTokens.includes(t) || host.split(".").includes(t));
+
+    // Los dominios de phishing pegan la marca a otras palabras ("sedeseg-social.online"),
+    // así que el token exacto no aparece. Se busca como subcadena, pero SOLO en etiquetas
+    // compuestas (con guión): así "amazonas.com", que es una palabra suelta que contiene
+    // "amazon", no salta.
+    if (!brandTokenPresent && registrableFirstLabel.includes("-")) {
+      const flat = registrableFirstLabel.replace(/-/g, "");
+      brandTokenPresent = [...tokens].some((t) => t.length >= 5 && flat.includes(t.replace(/-/g, "")));
+    }
+
     if (brandTokenPresent && !tokens.has(registrableFirstLabel)) {
       flags.push("brand_in_hostname");
       break;
@@ -165,13 +216,26 @@ function offlineHeuristics(url, knownDomains) {
   const tld = host.split(".").pop();
   if (SUSPICIOUS_TLDS.has(tld)) flags.push("suspicious_tld");
 
+  const bare = host.replace(/^www\./, "");
+  if (SHORTENERS.has(bare)) flags.push("shortened_url");
+  if (EXECUTABLE_URL_EXT.test(url.pathname + url.search)) flags.push("executable_link");
+
   flags.push(...brandImpersonationFlags(host));
 
   // El umbral se bajó a 1 porque a distancia 2 chocaban marcas legítimas entre sí
   // (github.com/gitlab.com, x.com/t.co). La causa real era comparar dos dominios que
   // ESTÁN AMBOS en la lista: si el host ya es un dominio conocido, no hay nada que sospechar.
   // Con esa guarda se puede volver a 2 y así se cazan cosas como "payypall.com".
+  // Se compara la forma DECODIFICADA y sin tildes: "xn--crreos-9va.es" es "córreos.es",
+  // que a la vista es "correos.es". En punycode la distancia de edición es enorme y se
+  // colaba; sin tildes es una coincidencia exacta con un dominio conocido.
   const bareHost = host.replace(/^www\./, "");
+  const unicodeHost = punycodeToUnicode(bareHost);
+  const deaccented = unicodeHost.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (deaccented !== bareHost && knownDomains.includes(deaccented)) {
+    if (!flags.includes("homograph")) flags.push("homograph");
+  }
+
   const hostFirstLabel = bareHost.split(".")[0];
   // Un subdominio de un dominio conocido (s.correos.es) es el propio dominio conocido.
   const isKnownGood = knownDomains.some((d) => bareHost === d || bareHost.endsWith(`.${d}`));
@@ -292,6 +356,7 @@ export async function checkUrl(rawInput, { networkEnabled }) {
     httpCode,
     ageDays,
     reputation,
+    previewUrl: shortenerPreviewUrl(url.href),
     flags,
     riskScore,
     verdict,

@@ -30,6 +30,9 @@ const SIGNATURES = [
   { name: "MP4 / MOV", mime: "video/mp4", ext: ["mp4", "mov", "m4v"], executable: false, match: (v) => bytesAt(v, 4, "66 74 79 70") },
   { name: "WAV", mime: "audio/wav", ext: ["wav"], executable: false, match: (v) => bytesAt(v, 0, "52 49 46 46") && bytesAt(v, 8, "57 41 56 45") },
   { name: "WebP", mime: "image/webp", ext: ["webp"], executable: false, match: (v) => bytesAt(v, 0, "52 49 46 46") && bytesAt(v, 8, "57 45 42 50") },
+  // ISO/IMG: hoy es un formato de entrega de malware muy usado porque el contenido no hereda
+  // la marca de "descargado de internet" y se salta el aviso de Windows. La firma va en 0x8001.
+  { name: "ISO (imagen de disco)", mime: "application/x-iso9660-image", ext: ["iso"], executable: false, match: (v) => bytesAt(v, 32769, "43 44 30 30 31") || bytesAt(v, 0, "43 44 30 30 31") },
   { name: "SQLite", mime: "application/vnd.sqlite3", ext: ["db", "sqlite", "sqlite3"], executable: false, match: (v) => bytesAt(v, 0, "53 51 4C 69 74 65 20 66 6F 72 6D 61 74 20 33 00") },
   { name: "Script (shebang)", mime: "text/x-shellscript", ext: ["sh", "bash", "py", "pl", "rb"], executable: true, match: (v) => bytesAt(v, 0, "23 21") },
 ];

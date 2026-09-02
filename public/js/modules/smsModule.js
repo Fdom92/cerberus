@@ -30,6 +30,18 @@ const LURE_WORDS = [
   "impago", "unpaid",
 ];
 
+// Estafa del "hijo en apuros": no lleva enlace, no menciona ninguna marca y no usa palabras
+// de urgencia clásicas, así que no dejaba ninguna señal. El patrón es constante: alguien dice
+// ser un familiar, anuncia un número nuevo y acaba pidiendo dinero.
+const FAMILY_WORDS = ["hola mama", "hola papa", "soy tu hijo", "soy tu hija", "hola soy tu"];
+const NEW_NUMBER_WORDS = [
+  "numero nuevo", "nuevo numero", "este es mi numero", "se me ha roto el movil",
+  "se me rompio el movil", "he cambiado de numero", "mi nuevo numero", "movil nuevo",
+];
+const MONEY_WORDS = [
+  "pago", "transferencia", "bizum", "ingreso", "dinero", "pagar", "abonar", "urgente",
+];
+
 const SHORTENERS = [
   "bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly", "buff.ly", "rebrand.ly",
   "cutt.ly", "bit.do", "tiny.cc", "shorturl.at", "s.id", "rb.gy", "v.gd", "tr.im", "shrtco.de", "x.co",
@@ -37,6 +49,7 @@ const SHORTENERS = [
 
 const FLAG_POINTS = {
   threat_intel_blocked: 80,
+  family_impersonation: 45,
   brand_domain_mismatch: 40,
   callback_number: 30,
   credential_request: 30,
@@ -49,6 +62,7 @@ const FLAG_POINTS = {
 };
 
 export const SMS_FLAG_LABELS = {
+  family_impersonation: "Alguien dice ser un familiar desde un número nuevo y acaba pidiendo dinero. Es la estafa del 'hijo en apuros': verifica llamando al número que YA tenías guardado, nunca a este",
   brand_domain_mismatch: "Menciona una entidad conocida pero el enlace no apunta a su dominio real — suplantación",
   callback_number: "Te pide llamar a un número por un problema con tu cuenta. Es la estafa telefónica clásica: nunca llames al número del mensaje, busca el oficial por tu cuenta",
   credential_request: "Pide verificar cuenta, contraseña o código — patrón clásico de phishing",
@@ -85,6 +99,14 @@ export async function checkSms(rawText, { networkEnabled = false } = {}) {
 
   // Vishing: sin enlace no había casi nada que analizar, pero "su cuenta está bloqueada,
   // llame a este número" es una estafa muy extendida y no dejaba ninguna señal.
+  // Familiar + número nuevo + petición de dinero: dos de los tres bastan, porque los
+  // mensajes reales no siempre traen los tres en el primer envío.
+  const famSignals =
+    (matchesAny(rawText, FAMILY_WORDS) ? 1 : 0) +
+    (matchesAny(rawText, NEW_NUMBER_WORDS) ? 1 : 0) +
+    (matchesAny(rawText, MONEY_WORDS) ? 1 : 0);
+  if (famSignals >= 2) flags.push("family_impersonation");
+
   const hasPhone = /(?:\+34[\s-]?)?(?:\d[\s-]?){9,}/.test(rawText);
   const problemContext = matchesAny(rawText, [
     "cuenta", "tarjeta", "bloque", "suspend", "seguridad", "fraude", "cargo", "account", "card",

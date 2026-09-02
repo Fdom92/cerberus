@@ -4,8 +4,18 @@ import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../te
 import { BRAND_DOMAINS } from "../brandDomains.js";
 import { checkDomainsReputation } from "../reputation.js";
 
+// Peticiones de datos sensibles: en correo son la carga útil habitual (cambiar la cuenta
+// de la nómina, "actualice sus datos bancarios") y no se miraban en absoluto.
+const MAIL_CREDENTIAL_WORDS = [
+  "actualice sus datos", "actualiza tus datos", "datos bancarios", "verifique su cuenta",
+  "verifica tu cuenta", "confirme su identidad", "confirme sus datos", "introduzca sus datos",
+  "update your details", "verify your account", "confirm your identity", "banking details",
+  "mantengala pulsando", "mantener contraseña", "keep my password", "revalide su",
+];
+
 const FLAG_POINTS = {
   threat_intel_blocked: 80,
+  credential_request: 30,
   display_name_spoof: 50,
   brand_domain_mismatch: 40,
   spf_fail: 30,
@@ -25,6 +35,7 @@ const FLAG_POINTS = {
 };
 
 export const MAIL_FLAG_LABELS = {
+  credential_request: "Pide datos bancarios, credenciales o confirmación de identidad — la carga útil típica del phishing por correo",
   display_name_spoof: "El nombre mostrado imita una marca conocida pero el dominio real no coincide",
   brand_domain_mismatch: "El cuerpo menciona una entidad conocida pero sus enlaces no apuntan a su dominio real",
   spf_fail: "SPF falló — el servidor de envío no está autorizado por el dominio",
@@ -152,7 +163,10 @@ export async function checkMail(rawInput, { networkEnabled = false } = {}) {
   const bodyUrlHosts = [];
   let reputations = [];
   if (body.trim()) {
-    if (matchesAny(body, OFFICIAL_NOTICE_WORDS)) flags.push("official_notice_language");
+    // El asunto entra en el análisis de texto: el fraude del CEO pone ahí "Acción requerida"
+    // y el cuerpo va limpio, así que mirando solo el cuerpo no saltaba nada.
+    if (matchesAny(`${subject}\n${body}`, OFFICIAL_NOTICE_WORDS)) flags.push("official_notice_language");
+    if (matchesAny(`${subject}\n${body}`, MAIL_CREDENTIAL_WORDS)) flags.push("credential_request");
 
     for (const raw of extractUrls(body)) {
       const { href, flags: uFlags } = await offlineUrlFlags(raw);
