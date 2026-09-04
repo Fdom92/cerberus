@@ -1,7 +1,7 @@
 {
   "name": "Cerberus — Centro de análisis",
   "short_name": "Cerberus",
-  "description": "Estación local de comprobaciones de ciberseguridad: URLs, archivos y más.",
+  "description": "Comprueba enlaces, códigos QR, SMS, correos y archivos sospechosos desde el móvil. Funciona sin conexión y sin enviar tus datos a ningún sitio.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
