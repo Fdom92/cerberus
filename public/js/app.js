@@ -53,7 +53,7 @@ function flagSeverity(flag) {
 }
 // Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
 // saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -554,7 +554,7 @@ function initPasswordTool() {
     resultEl.innerHTML = `
       <span class="verdict ${verdictClass}">${escapeHtml(category)}</span>
       <div class="score">Entropía estimada: ${entropy} bits · ${length} caracteres</div>
-      <div class="meta" style="background:var(--bg);border-radius:8px;height:8px;overflow:hidden;margin:6px 0 12px">
+      <div class="meta" style="background:var(--bg);border-radius:var(--e2);height:var(--e2);overflow:hidden;margin:var(--e2) 0 var(--e3)">
         <div style="width:${pct}%;height:100%;background:var(--accent)"></div>
       </div>
       <ul class="flags">${flagsHtml(flags, "Sin patrones débiles detectados")}</ul>

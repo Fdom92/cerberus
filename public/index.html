@@ -253,6 +253,10 @@
       <button type="button" class="sample-btn" id="sampleMailSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleMailMalicious">🚩 Probar malicioso</button>
     </div>
+    <form id="mailForm">
+      <textarea id="mailInput" rows="8" placeholder="Pega las cabeceras (lo mejor) o el texto del correo tal cual" required></textarea>
+      <button type="submit">Analizar</button>
+    </form>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
       <span><strong>Comprobar también en internet</strong><small>Mira si los enlaces del mensaje están denunciados. Sale una consulta de tu dispositivo.</small></span>
@@ -260,10 +264,6 @@
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
     </p>
-    <form id="mailForm">
-      <textarea id="mailInput" rows="8" placeholder="Pega las cabeceras (lo mejor) o el texto del correo tal cual" required></textarea>
-      <button type="submit">Analizar correo</button>
-    </form>
     <div id="mailResult" class="result" hidden></div>
   </section>
 
@@ -284,6 +284,10 @@
       <button type="button" class="sample-btn" id="sampleSmsSafe">✅ Probar seguro</button>
       <button type="button" class="sample-btn danger" id="sampleSmsMalicious">🚩 Probar malicioso</button>
     </div>
+    <form id="smsForm">
+      <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
+      <button type="submit">Analizar</button>
+    </form>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
       <span><strong>Comprobar también en internet</strong><small>Mira si los enlaces del mensaje están denunciados. Sale una consulta de tu dispositivo.</small></span>
@@ -291,10 +295,6 @@
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
     </p>
-    <form id="smsForm">
-      <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
-      <button type="submit">Analizar mensaje</button>
-    </form>
     <div id="smsResult" class="result" hidden></div>
   </section>
 
@@ -312,6 +312,7 @@
       <input id="dnsInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ejemplo.com" required>
       <button type="submit">Comprobar</button>
     </form>
+    <p class="netwarn aviso-accion">Al pulsar <em>Comprobar</em>, el dominio se consulta en el DNS público de <strong>Cloudflare</strong> (cloudflare-dns.com). No se envía nada más de tu dispositivo.</p>
     <div id="dnsResult" class="result" hidden></div>
   </section>
 
@@ -324,7 +325,7 @@
     </details>
     <div class="sample-row">
       <button type="button" class="sample-btn" id="sampleJwtSafe">✅ Probar válido</button>
-      <button type="button" class="sample-btn danger" id="sampleJwtMalicious">🚩 Probar alg:none</button>
+      <button type="button" class="sample-btn danger" id="sampleJwtMalicious">🚩 Probar sin firma</button>
     </div>
     <form id="jwtForm">
       <textarea id="jwtInput" rows="4" placeholder="eyJhbGciOi...header.eyJzdWIiOi...payload.firma" required></textarea>
@@ -343,8 +344,8 @@
     <details class="detalle"><summary>Qué comprueba exactamente</summary>
       <p>Cualquier web puede usar WebRTC para preguntarle a tu navegador tu IP local y tu IP pública vista por un servidor STUN — sin permiso, sin aviso. Si usas VPN, esa consulta a veces se salta el túnel y revela tu IP real. Esta comprobación hace lo mismo a propósito y lo compara contra tu IP pública vista por una petición HTTPS normal (que sí pasa por la VPN), para que veas si hay discrepancia.</p>
     </details>
-    <p class="netwarn">Al pulsar, tu navegador contacta <strong>stun.l.google.com</strong> (STUN) y <strong>api.ipify.org</strong> (IP pública) para comparar. No se guarda nada en historial — es información sobre ti, no un archivo o mensaje externo.</p>
-    <button type="button" id="webrtcRun">🔍 Ejecutar comprobación</button>
+    <button type="button" id="webrtcRun">Comprobar mi IP</button>
+    <p class="netwarn aviso-accion">Al pulsar, tu navegador contacta <strong>stun.l.google.com</strong> (STUN) y <strong>api.ipify.org</strong> (IP pública) para comparar. No se guarda nada en historial — es información sobre ti, no un archivo o mensaje externo.</p>
     <div id="webrtcResult" class="result" hidden></div>
   </section>
 
@@ -356,20 +357,20 @@
       <p>Estimación de fuerza offline (entropía + patrones comunes). La contraseña no se envía ni se guarda en ningún sitio, ni siquiera en el historial.</p>
     </details>
     <div class="sample-row">
-      <button type="button" class="sample-btn danger" id="samplePasswordWeak">🚩 Probar débil</button>
       <button type="button" class="sample-btn" id="samplePasswordStrong">✅ Probar fuerte</button>
+      <button type="button" class="sample-btn danger" id="samplePasswordWeak">🚩 Probar débil</button>
     </div>
     <div class="row">
       <input id="passwordInput" type="password" autocomplete="off" placeholder="Escribe una contraseña para probar">
       <button type="button" id="passwordToggle" class="secondary">Ver</button>
     </div>
-    <div id="passwordResult" class="result" hidden></div>
-
     <div id="pwnedSection" hidden>
-      <button type="button" id="pwnedCheckBtn" class="secondary">🔍 Comprobar si está filtrada (Have I Been Pwned)</button>
-      <p class="netwarn">Envía solo los primeros 5 caracteres del hash SHA-1 de la contraseña a <strong>api.pwnedpasswords.com</strong> — la contraseña en sí nunca sale del dispositivo (k-anonimity). No se guarda en historial.</p>
-      <div id="pwnedResult" class="result" hidden></div>
+      <button type="button" id="pwnedCheckBtn" class="secondary">Comprobar si está filtrada</button>
+      <p class="netwarn aviso-accion">Envía solo los primeros 5 caracteres del hash SHA-1 de la contraseña a <strong>api.pwnedpasswords.com</strong> — la contraseña en sí nunca sale del dispositivo (k-anonimity). No se guarda en historial.</p>
     </div>
+    <div id="passwordResult" class="result" hidden></div>
+    <div id="pwnedResult" class="result" hidden></div>
+
   </section>
 
   <section id="panel-decode" class="panel">
@@ -402,7 +403,7 @@
     </div>
     <form id="secretsForm">
       <textarea id="secretsInput" rows="8" placeholder="const AWS_KEY = 'AKIA...'&#10;api_key: 'sk_live_...'" required></textarea>
-      <button type="submit">Escanear</button>
+      <button type="submit">Analizar</button>
     </form>
     <div id="secretsResult" class="result" hidden></div>
   </section>
@@ -418,8 +419,8 @@
       <p>Sube un .apk o .ipa: extrae el manifest (<code>AndroidManifest.xml</code> o <code>Info.plist</code>) — paquete + permisos declarados, marcando los peligrosos — y escanea todo el binario en busca de secretos embebidos (keys, tokens). También funciona con cualquier binario (.exe, .dylib) solo para la parte de secretos. Todo se procesa en tu dispositivo.</p>
     </details>
     <div class="sample-row">
-      <button type="button" class="sample-btn danger" id="sampleAppsApk">🤖 Probar APK sospechosa</button>
-      <button type="button" class="sample-btn danger" id="sampleAppsIpa">🍎 Probar IPA sospechosa</button>
+      <button type="button" class="sample-btn danger" id="sampleAppsApk">🚩 Probar APK sospechosa</button>
+      <button type="button" class="sample-btn danger" id="sampleAppsIpa">🚩 Probar IPA sospechosa</button>
     </div>
     <div class="dropzone" id="appsDropZone">
       <p>Arrastra un .apk, .ipa u otro binario aquí, o</p>
@@ -442,8 +443,8 @@
       <p>Por eso funciona pegar una pegatina encima del código de un parquímetro, una multa o la carta de un bar. Se decodifica con el propio navegador —la imagen no sale de tu dispositivo— y se clasifica el contenido: si es un enlace pasa por el análisis de URLs completo, y se avisa aparte de las cargas propias del formato (alta de doble factor, wifi abierta, SMS ya redactado, números de tarificación especial, solicitudes de pago).</p>
     </details>
     <div class="sample-row">
-      <button type="button" class="sample-btn" id="sampleQrSafe">✅ QR normal</button>
-      <button type="button" class="sample-btn danger" id="sampleQrMalicious">🚩 QR de pegatina falsa</button>
+      <button type="button" class="sample-btn" id="sampleQrSafe">✅ Probar QR normal</button>
+      <button type="button" class="sample-btn danger" id="sampleQrMalicious">🚩 Probar QR falso</button>
     </div>
     <div class="dropzone" id="qrDropZone">
       <p>Arrastra la foto del código aquí, o</p>
@@ -458,7 +459,7 @@
         <span>O pega aquí el contenido del código</span>
         <textarea id="qrText" rows="3" placeholder="https://…  ·  WIFI:T:…  ·  otpauth://…"></textarea>
       </label>
-      <button type="submit">Analizar contenido</button>
+      <button type="submit">Analizar</button>
     </form>
     <label class="toggle">
       <input type="checkbox" class="net-toggle">
@@ -486,8 +487,8 @@
       <p>Lee metadatos EXIF de una foto (JPEG): cámara, fecha y — lo más importante antes de compartirla — si lleva coordenadas GPS. Se procesa en tu dispositivo.</p>
     </details>
     <div class="sample-row">
-      <button type="button" class="sample-btn" id="sampleExifClean">✅ Foto sin GPS</button>
-      <button type="button" class="sample-btn danger" id="sampleExifGps">🚩 Foto con GPS</button>
+      <button type="button" class="sample-btn" id="sampleExifClean">✅ Probar foto sin GPS</button>
+      <button type="button" class="sample-btn danger" id="sampleExifGps">🚩 Probar foto con GPS</button>
     </div>
     <div class="dropzone" id="exifDropZone">
       <p>Arrastra una imagen aquí, o</p>
@@ -502,7 +503,7 @@
 </main>
 
 <footer class="footer">
-  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">red: desactivada</span> · <span id="appVersion" title="Si tienes la app instalada y aquí no ves esta versión, tu móvil sigue con una copia antigua en caché.">v1.1.0</span></span>
+  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">red: desactivada</span> · <span id="appVersion" title="Si tienes la app instalada y aquí no ves esta versión, tu móvil sigue con una copia antigua en caché.">v1.1.1</span></span>
 </footer>
 
 <script type="module" src="js/app.js"></script>

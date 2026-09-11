@@ -704,3 +704,28 @@ la ubicación al elegir la foto desde el navegador. Por eso el texto dice "algun
 
 77/77 tests (tres nuevos para el correo sin cabeceras), 0 falsos positivos incluidos cinco
 correos legítimos pegados como texto, sin cambios en campañas ni evasiones.
+
+### v1.1.1 — el mismo orden en todos los paneles (2026-09-11)
+
+Cada herramienta se había ido montando por separado y el interruptor de internet estaba
+**debajo** del formulario en URLs y QR pero **encima** en Correo y SMS; en Contraseña la
+consulta de filtraciones iba después del resultado; en WebRTC el aviso iba antes del botón y en
+DNS no había aviso visible (el de Cloudflare vivía dentro del desplegable técnico).
+
+Orden común, que es el que hay que respetar al añadir herramientas:
+
+```
+volver → título → frase → [cómo lo consigo] → [qué comprueba] → [pruebas]
+      → ENTRADA (formulario y/o subida) → [red] → resultado(s)
+```
+
+- El bloque de red va siempre **entre la entrada y el resultado**.
+- El aviso de red va siempre **justo debajo del control que dispara la conexión**: debajo del
+  interruptor, o debajo del botón en DNS, WebRTC y filtraciones de contraseña.
+- Pruebas: "✅ Probar…" primero y "🚩 Probar…" después.
+- Botón principal: un verbo sin emoji — **Analizar**, **Comprobar** (consultas sobre ti o un
+  dominio) o **Decodificar**.
+
+Excepciones deliberadas: DNS y WebRTC no tienen botones de prueba (DNS tendría que salir a la
+red al pulsarlos y WebRTC no tiene entrada), y JWT, Contraseña, Decodificador y Secretos no
+llevan "cómo lo consigo" porque no hay nada que explicar sobre de dónde sale lo que se pega.

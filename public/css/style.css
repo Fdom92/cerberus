@@ -802,3 +802,9 @@ button.danger-btn {
 .detalle > .pasos ul { margin: 0 0 var(--e2); padding-left: var(--e5); }
 .detalle > .pasos li { margin-bottom: var(--e1); }
 .detalle > .pasos strong { color: var(--text); font-weight: 600; }
+
+/* Aviso de red que acompaña a un botón que conecta (DNS, WebRTC, filtraciones de contraseña).
+   Va justo DEBAJO del botón, igual que el aviso del interruptor va debajo del interruptor: en
+   toda la app el aviso sigue al control que dispara la conexión. Un botón es inline-block y no
+   tiene margen, así que sin este margen superior el aviso quedaba pegado a él. */
+.netwarn.aviso-accion { margin: var(--e3) 0 0; }
