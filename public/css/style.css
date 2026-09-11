@@ -808,3 +808,13 @@ button.danger-btn {
    toda la app el aviso sigue al control que dispara la conexión. Un botón es inline-block y no
    tiene margen, así que sin este margen superior el aviso quedaba pegado a él. */
 .netwarn.aviso-accion { margin: var(--e3) 0 0; }
+
+/* Campo de una línea dentro de un formulario (URLs, DNS): el botón va DEBAJO, igual que en los
+   que tienen área de texto. Antes iban en fila con el botón pegado al final del campo, y eran
+   los únicos dos paneles donde se pulsaba en otro sitio. La fila (.row) queda solo para
+   Contraseña, donde "Ver" es parte del campo y no un botón de enviar. */
+form > input[type="text"] {
+  display: block;
+  width: 100%;
+  margin: 0 0 var(--e3);
+}
