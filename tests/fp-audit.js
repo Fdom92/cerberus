@@ -215,6 +215,17 @@ const BENIGN_MAILS_2 = [
   },
 ];
 
+// ---------------- Correos legítimos pegados sin cabeceras ----------------
+// El camino nuevo de mailModule: quien no sabe sacar las cabeceras pega el texto. Estos son
+// correos corrientes, algunos mencionando marcas reales con enlaces a su dominio real.
+const BENIGN_MAIL_BODIES = [
+  { name: "texto: factura de Iberdrola con enlace real", raw: "Hola Fernando, ya tienes disponible tu factura de marzo en el área de clientes. Puedes consultarla en https://www.iberdrola.es/clientes . Gracias por confiar en Iberdrola." },
+  { name: "texto: pedido de Amazon con enlace real", raw: "Tu pedido ha sido enviado y llegará el jueves. Puedes seguirlo en https://www.amazon.es/gp/your-account/order-history" },
+  { name: "texto: fotos compartidas por un amigo", raw: "Te paso las fotos de la boda: https://photos.google.com/share/AF1QipN123 . Un abrazo" },
+  { name: "texto: correo de trabajo sin enlaces", raw: "Adjunto el acta de la reunión. Revisad los puntos 3 y 4 antes del jueves, por favor." },
+  { name: "texto: aviso real de Correos", raw: "Tu envío PQ4B6M0012345 está en reparto. Consulta el seguimiento en https://www.correos.es/es/es/herramientas/localizador/envios" },
+];
+
 async function run() {
   // URLs
   for (const u of BENIGN_URLS) {
@@ -243,7 +254,7 @@ async function run() {
   }
 
   // Mail
-  for (const m of [...BENIGN_MAILS, ...BENIGN_MAILS_2]) {
+  for (const m of [...BENIGN_MAILS, ...BENIGN_MAILS_2, ...BENIGN_MAIL_BODIES]) {
     const r = await checkMail(m.raw);
     if (r.verdict !== "safe") record("Correo", m.name, r.verdict, r.flags);
   }

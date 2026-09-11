@@ -781,3 +781,24 @@ button.danger-btn {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ---- "Cómo lo consigo" ----
+   Pistas de uso, distintas del desplegable técnico: dicen de dónde sacar lo que hay que pegar
+   (las cabeceras de un correo, el dominio, un .apk). Van en color de acento porque son las
+   que desbloquean la herramienta, y pegadas al desplegable técnico para leerse como un grupo. */
+.detalle.como { margin-bottom: var(--e1); }
+.detalle.como > summary { color: var(--accent); }
+.detalle.como > summary:hover { color: var(--accent); text-decoration: underline; }
+
+.detalle > .pasos {
+  margin: var(--e1) 0 0;
+  padding-left: var(--e3);
+  border-left: 2px solid var(--border);
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.detalle > .pasos p { margin: 0 0 var(--e2); }
+.detalle > .pasos p:last-child { margin-bottom: 0; }
+.detalle > .pasos ul { margin: 0 0 var(--e2); padding-left: var(--e5); }
+.detalle > .pasos li { margin-bottom: var(--e1); }
+.detalle > .pasos strong { color: var(--text); font-weight: 600; }

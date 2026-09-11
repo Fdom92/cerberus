@@ -53,7 +53,7 @@ function flagSeverity(flag) {
 }
 // Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
 // saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -409,7 +409,7 @@ function initMailForm() {
     const raw = input.value.trim();
     if (!raw) return;
     resultEl.hidden = false;
-    resultEl.innerHTML = '<p class="hint">Analizando cabeceras…</p>';
+    resultEl.innerHTML = '<p class="hint">Analizando…</p>';
     try {
       const r = await checkMail(raw, { networkEnabled: isNetEnabled() });
       const meta = [];
@@ -783,12 +783,12 @@ function initExifTool() {
       if (!exif.hasExif) {
         resultEl.innerHTML = exif.malformed
           ? `<p class="hint">Los metadatos de esta imagen están corruptos o incompletos y no se han podido leer.</p>`
-          : `<p class="hint">Sin datos EXIF (o no es JPEG con metadatos) — no se detectaron cámara, fecha ni GPS.</p>`;
+          : `<p class="hint">No se han encontrado metadatos: ni cámara, ni fecha, ni GPS. Si es una foto de iPhone en formato HEIC, esta herramienta no puede leerla.</p>`;
         return;
       }
       const gpsHtml = exif.gps
         ? `<ul class="flags"><li class="bad">Coordenadas GPS: ${exif.gps.lat.toFixed(6)}, ${exif.gps.lon.toFixed(6)} — esta foto revela dónde se tomó</li></ul>`
-        : `<ul class="flags"><li class="info">Sin coordenadas GPS</li></ul>`;
+        : `<ul class="flags"><li class="info">No se han encontrado coordenadas GPS en la foto que ha recibido la app. Algunos móviles quitan la ubicación al pasar una foto a una web, así que esto no garantiza que la original no la lleve.</li></ul>`;
       const meta = [];
       if (exif.make || exif.model) meta.push(`Cámara: ${[exif.make, exif.model].filter(Boolean).join(" ")}`);
       if (exif.dateTimeOriginal || exif.dateTime) meta.push(`Fecha: ${exif.dateTimeOriginal || exif.dateTime}`);

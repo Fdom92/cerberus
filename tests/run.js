@@ -605,6 +605,42 @@ test("urlModule: checkUrl acepta persist:false y no escribe en el historial", as
   assertEqual((await listResults()).length, antes);
 });
 
+// ---- mailModule: texto pegado sin cabeceras ----
+// Casi nadie sabe sacar las cabeceras, y desde el móvil ni se puede: lo que se pega es el
+// texto. Antes eso se trataba como cabeceras vacías y un phishing evidente salía "safe".
+test("mailModule: un correo pegado sin cabeceras se analiza igual", async () => {
+  const r = await checkMail(`Estimado cliente,
+Hemos detectado un acceso no autorizado a su cuenta de BBVA. Por su seguridad la hemos bloqueado temporalmente.
+Para reactivarla verifique sus datos en las proximas 24 horas: https://bbva-seguridad-clientes.top/verificar
+Atentamente, Servicio de Atencion al Cliente BBVA`, { networkEnabled: false, persist: false });
+  assert(r.headersMissing, "no detectó que faltan las cabeceras");
+  assert(r.flags.includes("headers_missing"));
+  assert(r.verdict !== "safe", `un phishing sin cabeceras salió ${r.verdict}`);
+});
+
+test("mailModule: texto legítimo sin cabeceras no se marca ni se le acusa de no autenticar", async () => {
+  const r = await checkMail("Hola Ana, te adjunto el presupuesto que hablamos ayer. Un saludo, Luis",
+    { networkEnabled: false, persist: false });
+  assertEqual(r.verdict, "safe");
+  assert(!r.flags.includes("auth_results_missing"), "sin cabeceras no hay nada que autenticar");
+});
+
+test("mailModule: 'De:' y 'Asunto:' copiados de la vista de Gmail no se toman por cabeceras", async () => {
+  const r = await checkMail(
+    "De: BBVA <avisos@bbva-clientes.top>\nAsunto: Cuenta bloqueada\n\nVerifique sus datos: https://bbva-clientes.top/login",
+    { networkEnabled: false, persist: false });
+  assert(r.headersMissing);
+  assert(r.verdict !== "safe");
+});
+
+test("mailModule: las cabeceras reales siguen yendo por el análisis de cabeceras", async () => {
+  const r = await checkMail(
+    "From: PayPal <service@paypa1-secure.com>\nReturn-Path: bounce@paypa1-secure.com\nAuthentication-Results: mx; spf=fail; dkim=fail; dmarc=fail\n\nVerifique su cuenta",
+    { networkEnabled: false, persist: false });
+  assert(!r.headersMissing);
+  assert(r.flags.includes("spf_fail"));
+});
+
 // ---- netPref: el ajuste de red es de privacidad ----
 // El botón "comprobar también en red" que sale dentro de un resultado dejaba la preferencia
 // encendida de forma permanente en las cuatro herramientas. El usuario había pedido repetir

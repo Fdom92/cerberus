@@ -661,3 +661,46 @@ De paso: el historial seguía mostrando `DANGEROUS`/`SUSPICIOUS` en inglés y co
 lo único que quedaba sin traducir ni pasar al conjunto de iconos SVG.
 
 Verificado midiendo los huecos reales del DOM en los catorce paneles: todos caen en la escala.
+
+
+### v1.1.0 — pistas de uso y el correo pegado sin cabeceras (2026-09-11)
+
+Empezó como "añadir cómo se copian las cabeceras" y destapó un falso negativo serio.
+
+**El fallo.** Casi nadie sabe sacar las cabeceras de un correo, y desde las apps del móvil ni
+siquiera se puede: lo que la gente pega es el texto. `splitHeadersAndBody` trataba como
+cabeceras todo lo anterior a la primera línea en blanco, así que un correo pegado tal cual se
+analizaba como cabeceras vacías y el cuerpo no llegaba a mirarse. Un phishing de BBVA evidente
+salía **safe, 10 puntos** en Correo mientras el mismo texto en SMS salía **dangerous, 100**. Es
+decir: la herramienta fallaba justo con el público al que iban dirigidas las pistas.
+
+**El arreglo.** `looksLikeHeaders()` exige que la primera línea sea un campo de cabecera
+conocido y que el primer bloque tenga forma de cabeceras. Si no, el texto va por
+`checkSms` —probado contra las campañas reales— en vez de mantener una segunda copia de esas
+heurísticas, más las frases de petición de datos propias del correo. Se añade
+`headers_missing` (0 puntos: informa, no acusa) y **no** se emite `auth_results_missing`, que
+sin cabeceras no significa nada. "De:" y "Asunto:" copiados de la vista de Gmail no cuentan
+como cabeceras: son la interfaz traducida, y se analizan como texto.
+
+**Pistas "Cómo lo consigo"**, en un desplegable propio en color de acento, separado del técnico:
+
+- Correo: pasos para Gmail, Outlook web, Outlook de escritorio y Mail de Mac (el atajo ⌥⌘U no
+  depende del idioma del sistema), y qué hacer si solo tienes el móvil.
+- URLs: copiar el mensaje en lugar de mantener pulsado el enlace, porque en iPhone eso puede
+  cargar una vista previa de la página. Compartir con Cerberus solo en Android: Safari no
+  soporta Web Share Target.
+- SMS, DNS, Archivos, Apps, WebRTC y QR: de dónde sale lo que hay que pegar o subir.
+
+**QR** usaba `capture="environment"`, que en el móvil abre la cámara directamente y no deja
+elegir de la galería. Si el QR llegaba en una captura o por WhatsApp, no había forma de subirlo.
+
+**EXIF** decía "Sin coordenadas GPS" a secas. Algunos móviles quitan la ubicación al entregar
+una foto a una web, así que la ausencia aquí no dice nada de la foto original: ahora se dice.
+Y solo lee JPEG, cuando los iPhone guardan en HEIC por defecto.
+
+Lo que **no** he podido verificar en dispositivo real: cuándo exactamente Android e iOS quitan
+la ubicación al elegir la foto desde el navegador. Por eso el texto dice "algunos móviles" y
+"puede", no una afirmación que no tengo cómo sostener.
+
+77/77 tests (tres nuevos para el correo sin cabeceras), 0 falsos positivos incluidos cinco
+correos legítimos pegados como texto, sin cambios en campañas ni evasiones.

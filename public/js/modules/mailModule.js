@@ -3,6 +3,7 @@ import { offlineUrlFlags, FLAG_LABELS as URL_FLAG_LABELS, FLAG_POINTS as URL_FLA
 import { normalize, matchesAny, extractUrls, OFFICIAL_NOTICE_WORDS } from "../textHeuristics.js";
 import { BRAND_DOMAINS } from "../brandDomains.js";
 import { checkDomainsReputation } from "../reputation.js";
+import { checkSms, SMS_FLAG_POINTS } from "./smsModule.js";
 
 // Peticiones de datos sensibles: en correo son la carga útil habitual (cambiar la cuenta
 // de la nómina, "actualice sus datos bancarios") y no se miraban en absoluto.
@@ -31,6 +32,9 @@ export const MAIL_FLAG_POINTS = {
   dkim_missing: 15,
   dmarc_missing: 15,
   auth_results_missing: 10,
+  // No es una señal sobre el correo: dice que el análisis se ha hecho sin la parte que
+  // identifica al remitente. Informa, no suma.
+  headers_missing: 0,
   ...URL_FLAG_POINTS,
 };
 
@@ -48,8 +52,73 @@ export const MAIL_FLAG_LABELS = {
   dkim_missing: "No se encontró resultado DKIM en las cabeceras",
   dmarc_missing: "No se encontró resultado DMARC en las cabeceras",
   auth_results_missing: "No hay cabecera Authentication-Results — no se puede verificar SPF/DKIM/DMARC",
+  headers_missing: "Has pegado el texto del correo, sin cabeceras: se han analizado el contenido y los enlaces, pero no se puede comprobar quién lo envió de verdad",
   ...URL_FLAG_LABELS,
 };
+
+// Lo que casi todo el mundo va a pegar es el TEXTO del correo, no sus cabeceras: sacarlas
+// exige saber dónde está "Mostrar original", y desde el móvil ni siquiera se puede. Antes todo
+// lo que hubiera antes de la primera línea en blanco se trataba como cabeceras, así que un
+// correo pegado tal cual se analizaba como cabeceras vacías, el cuerpo no llegaba a mirarse, y
+// un phishing de BBVA evidente salía "sin señales de riesgo".
+//
+// Es cabecera si la primera línea es un campo de cabecera conocido y el primer bloque tiene
+// forma de cabeceras. "Asunto:" o "De:" copiados de la vista de Gmail NO cuentan: eso es la
+// interfaz traducida, no las cabeceras reales, y se analiza como texto.
+const HEADER_FIELD = /^[A-Za-z][A-Za-z0-9-]*:/;
+const KNOWN_HEADER =
+  /^(received|return-path|delivered-to|authentication-results|received-spf|arc-[a-z-]+|dkim-signature|message-id|mime-version|x-[a-z0-9-]+|from|to|cc|subject|date|reply-to|sender|content-type):/i;
+
+function looksLikeHeaders(raw) {
+  const primerBloque = raw.trim().split(/\r?\n\r?\n/)[0];
+  const lineas = primerBloque.split(/\r?\n/).filter((l) => l.trim());
+  if (lineas.length === 0 || !KNOWN_HEADER.test(lineas[0])) return false;
+  const primeras = lineas.slice(0, 6);
+  const conForma = primeras.filter((l) => HEADER_FIELD.test(l) || /^[ \t]/.test(l)).length;
+  return conForma >= Math.min(2, primeras.length);
+}
+
+// Sin cabeceras lo que queda es un mensaje de texto con enlaces, que es exactamente lo que ya
+// analiza smsModule y lo que está probado contra las campañas reales. Se reutiliza en lugar de
+// mantener una segunda copia de esas heurísticas, añadiendo solo las frases de petición de
+// datos propias del correo ("actualice sus datos bancarios").
+async function checkMailBodyOnly(texto, { networkEnabled, persist }) {
+  const sms = await checkSms(texto, { networkEnabled, persist: false });
+  const flags = ["headers_missing", ...sms.flags];
+  if (!flags.includes("credential_request") && matchesAny(texto, MAIL_CREDENTIAL_WORDS)) {
+    flags.push("credential_request");
+  }
+  const puntos = { ...SMS_FLAG_POINTS, ...MAIL_FLAG_POINTS };
+  const riskScore = Math.min(100, flags.reduce((sum, f) => sum + (puntos[f] || 0), 0));
+  const verdict = riskScore >= 70 ? "dangerous" : riskScore >= 30 ? "suspicious" : "safe";
+
+  const result = {
+    type: "mail",
+    headersMissing: true,
+    from: "",
+    fromDomain: null,
+    returnPathDomain: null,
+    replyToDomain: null,
+    bodyUrls: sms.urls,
+    reputations: sms.reputations,
+    flags,
+    riskScore,
+    verdict,
+    timestamp: Date.now(),
+  };
+  if (persist) {
+    await saveResult({
+      type: "mail",
+      input: texto.length > 80 ? texto.slice(0, 80) + "…" : texto,
+      verdict,
+      riskScore,
+      flags,
+      timestamp: result.timestamp,
+      raw: result,
+    });
+  }
+  return result;
+}
 
 function splitHeadersAndBody(raw) {
   const parts = raw.split(/\r?\n\r?\n/);
@@ -109,7 +178,10 @@ function mentionedBrandDomains(text) {
     .flatMap(([, domains]) => domains);
 }
 
-export async function checkMail(rawInput, { networkEnabled = false } = {}) {
+export async function checkMail(rawInput, { networkEnabled = false, persist = true } = {}) {
+  if (!looksLikeHeaders(rawInput)) {
+    return checkMailBodyOnly(rawInput.trim(), { networkEnabled, persist });
+  }
   const { headerBlock, body } = splitHeadersAndBody(rawInput);
   const headers = parseHeaders(headerBlock);
   const flags = [];
@@ -214,7 +286,7 @@ export async function checkMail(rawInput, { networkEnabled = false } = {}) {
     timestamp: Date.now(),
   };
 
-  await saveResult({
+  if (persist) await saveResult({
     type: "mail",
     input: from || "(cabecera sin From)",
     verdict,

@@ -16,7 +16,7 @@ Six of the thirteen tools never touch the network at all. Five more — URLs, QR
 |---|---|---|
 | **URLs** | Typosquatting, punycode/homograph, brand-as-subdomain and brand-in-hostname spoofing, IP-literal hosts, `@` tricks; optionally resolves the real destination behind a shortener, dates the domain (RDAP, falling back to Certificate Transparency for TLDs like `.es` that publish no RDAP) and looks it up against Cloudflare's phishing/malware lists | Offline by default, opt-in |
 | **QR** | Decodes a photographed QR with the browser's own `BarcodeDetector` — no library, the image never leaves the device — and shows exactly what it contains before the phone acts on it. Classifies the payload (link, wifi, `otpauth:` 2FA enrolment, prefilled SMS, premium-rate number, payment request, `javascript:`) and hands any embedded link to the URL analysis | Offline, opt-in for the link |
-| **Mail** | SPF/DKIM/DMARC parsing, From/Return-Path/Reply-To mismatches, brand impersonation in the display name and Subject, analysis of links in the body; optional threat-list lookup | Offline, opt-in threat lookup |
+| **Mail** | SPF/DKIM/DMARC parsing, From/Return-Path/Reply-To mismatches, brand impersonation in the display name and Subject, analysis of links in the body; optional threat-list lookup. Most people can't get the headers — phone mail apps don't show them — so pasting just the text works too: body and links are analysed, with a note that the sender couldn't be verified | Offline, opt-in threat lookup |
 | **SMS** | Smishing heuristics — urgency language, credential requests, brand/domain mismatch, callback-number scams, embedded shortened or suspicious links; optional threat-list lookup on the linked domains | Offline, opt-in threat lookup |
 | **DNS / SPF** | Looks up a domain's MX, SPF and DMARC records to see whether it's protected against being spoofed | Network (Cloudflare DoH) |
 | **Files** | Magic-byte signature detection vs. declared extension, SHA-256, Shannon entropy (flags packed/encrypted executables) | Offline |
@@ -34,7 +34,7 @@ History (IndexedDB, on-device only) records completed checks — except Password
 
 The verdict is the part most people will read, so it says what to *do* — "No lo abras", "Desconfía de este mensaje" — rather than naming a category, and it never says "safe" in the sense of *is safe*: what it reports is that none of the signals it knows how to look for were found, which is a different claim. A ring gauge carries the magnitude, since a bare `60/100` means nothing to someone who does not work in this. Findings are sorted by weight and shaded by it, so "this domain is on Cloudflare's phishing list" (80 points) no longer looks identical to "the TLD is a cheap one" (15).
 
-Each tool leads with a plain-language sentence and folds the technical description into a "Qué comprueba exactamente" disclosure — nothing was removed, it was reordered.
+Each tool leads with a plain-language sentence and folds the technical description into a "Qué comprueba exactamente" disclosure — nothing was removed, it was reordered. Where it isn't obvious how to get the input (an email's headers, which domain to check, where a received file lives on the phone), a second disclosure says how.
 
 Icons are a hand-drawn inline SVG set rather than emoji, which every platform renders in its own style. There are no webfonts: pulling one from a CDN would contradict "everything runs on your device" and break offline use, so the type is a system stack.
 
@@ -72,7 +72,7 @@ Open `http://localhost:8080`. Every tool works offline from there; the URL, SMS,
 
 ## Testing
 
-`tests/` is a zero-dependency regression suite: `tests/run.js` (69 tests) imports the real modules from `public/js/` and exercises them against hand-built synthetic fixtures (a JPEG with EXIF/GPS, a ZIP with stored and deflated entries, an AndroidManifest.xml, a binary plist — all constructed byte-by-byte in `tests/fixtures.js`, not mocked).
+`tests/` is a zero-dependency regression suite: `tests/run.js` (77 tests) imports the real modules from `public/js/` and exercises them against hand-built synthetic fixtures (a JPEG with EXIF/GPS, a ZIP with stored and deflated entries, an AndroidManifest.xml, a binary plist — all constructed byte-by-byte in `tests/fixtures.js`, not mocked).
 
 ```bash
 python3 -m http.server 8080
