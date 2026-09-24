@@ -117,6 +117,23 @@ async function getKnownDomains() {
   return knownDomainsCache;
 }
 
+// Dominios legítimos que la distancia de edición confunde con una marca conocida: "usps.com"
+// está a UNA edición de "ups.com" y "chess.com" a dos de "chase.com", y los dos son reales.
+// Ninguna regla de distancia los separa, así que se listan. La lista sale de medir la
+// heurística contra el top 20.000 de Tranco y curar el resultado a mano (ver
+// tests/validacion-externa.html); los que parecían squats se dejaron fuera a propósito.
+let noTyposquatCache = null;
+async function getNoTyposquat() {
+  if (noTyposquatCache) return noTyposquatCache;
+  try {
+    const res = await fetch(new URL("../../data/no-son-typosquat.json", import.meta.url));
+    noTyposquatCache = await res.json();
+  } catch {
+    noTyposquatCache = [];
+  }
+  return noTyposquatCache;
+}
+
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
@@ -162,18 +179,38 @@ function brandImpersonationFlags(host) {
   const registrableFirstLabel = registrable.split(".")[0];
 
   for (const [brand, domains] of Object.entries(BRAND_DOMAINS)) {
+    const tokens = brandTokens(brand);
     const legit = domains.some((d) => registrable === d || host === d || host.endsWith(`.${d}`));
     if (legit) return []; // es realmente un dominio de la marca
 
-    // A) el dominio de la marca aparece dentro del host pero no es el dominio real
-    if (domains.some((d) => host.includes(`${d}.`) || host.includes(`.${d}`))) {
+    // Un TLD que ES la marca (.google, .microsoft, .apple, .amazon) lo controla esa marca:
+    // ICANN se lo delegó a ella. "blog.google" y "cloud.microsoft" son suyos por definición.
+    // Sin esto, catorce dominios reales de Google, Microsoft y Apple salían marcados.
+    if (tokens.has(host.split(".").pop())) return [];
+
+    // El dominio de país de la marca: "google.com.br", "amazon.com.mx", "santander.com.br".
+    // Tienen la MISMA forma que el ataque ("google.com" seguido de algo), y por eso los treinta
+    // dominios de país que hay en el millón de Tranco salían como suplantación. Se distinguen
+    // en que lo que sigue es un código de país de dos letras y ahí se acaba el dominio.
+    // A cambio, una marca registrada en un ccTLD ajeno ("google.io") se da por buena; se acepta
+    // porque el phishing real usa TLD baratos de tres o más letras (.top, .online, .cfd).
+    const esDominioDePais = domains.some((d) => {
+      const etiqueta = d.split(".")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`^${etiqueta}(\\.(com|co|net|org|gob|gov|edu|ac))?\\.[a-z]{2}$`).test(registrable);
+    });
+    if (esDominioDePais) return [];
+
+    // A) el dominio de la marca aparece dentro del host pero no es el dominio real.
+    // La comparación es por etiquetas completas, no por subcadena: con subcadena, dominios
+    // cortos de marca como "a.co" (Amazon) o "g.co" (Google) marcaban "honda.co.jp",
+    // "samsung.co.kr" o "mega.co.nz", porque "honda.co" contiene literalmente "a.co".
+    if (domains.some((d) => `.${host}`.includes(`.${d}.`))) {
       flags.push("brand_subdomain_spoof");
       break;
     }
 
     // B) el nombre de la marca aparece como token del host, pero el dominio no es suyo.
     // Se exige token exacto (separado por . o -) para no marcar "amazonas.com" por "amazon".
-    const tokens = brandTokens(brand);
     const hostTokens = host.split(/[.-]/);
     let brandTokenPresent = [...tokens].some((t) => hostTokens.includes(t) || host.split(".").includes(t));
 
@@ -213,7 +250,7 @@ function parseUrl(raw) {
   return url;
 }
 
-function offlineHeuristics(url, knownDomains) {
+function offlineHeuristics(url, knownDomains, noTyposquat = []) {
   const flags = [];
   const host = url.hostname;
 
@@ -254,7 +291,7 @@ function offlineHeuristics(url, knownDomains) {
   const hostFirstLabel = bareHost.split(".")[0];
   // Un subdominio de un dominio conocido (s.correos.es) es el propio dominio conocido.
   const isKnownGood = knownDomains.some((d) => bareHost === d || bareHost.endsWith(`.${d}`));
-  if (!isKnownGood) {
+  if (!isKnownGood && !(noTyposquat || []).includes(bareHost)) {
     for (const known of knownDomains) {
       // Misma marca en otro país (amazon.de frente a amazon.es) comparte la primera etiqueta
       // y solo cambia el TLD: son 2 ediciones, pero es el dominio legítimo, no un typosquat.
@@ -436,7 +473,8 @@ function scoreFlags(flags) {
 export async function checkUrl(rawInput, { networkEnabled, persist = true } = {}) {
   const url = parseUrl(rawInput);
   const knownDomains = await getKnownDomains();
-  const flags = offlineHeuristics(url, knownDomains);
+  const noTyposquat = await getNoTyposquat();
+  const flags = offlineHeuristics(url, knownDomains, noTyposquat);
 
   let finalUrl = null;
   let httpCode = null;
@@ -460,7 +498,7 @@ export async function checkUrl(rawInput, { networkEnabled, persist = true } = {}
       try {
         const destino = parseUrl(finalUrl);
         if (destino.hostname !== url.hostname) {
-          for (const f of offlineHeuristics(destino, knownDomains)) {
+          for (const f of offlineHeuristics(destino, knownDomains, noTyposquat)) {
             if (!flags.includes(f)) flags.push(f);
           }
         }
@@ -526,7 +564,10 @@ export async function offlineUrlFlags(rawInput) {
   try {
     const url = parseUrl(rawInput);
     const knownDomains = await getKnownDomains();
-    return { href: url.href, flags: offlineHeuristics(url, knownDomains) };
+    const noTyposquat = await getNoTyposquat();
+    // SMS y Correo analizan sus enlaces por aquí: sin pasar la lista, las excepciones
+    // valdrían en la herramienta de URLs y no en las otras dos.
+    return { href: url.href, flags: offlineHeuristics(url, knownDomains, noTyposquat) };
   } catch {
     return { href: rawInput, flags: [] };
   }

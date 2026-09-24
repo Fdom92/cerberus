@@ -729,3 +729,44 @@ volver → título → frase → [cómo lo consigo] → [qué comprueba] → [pr
 Excepciones deliberadas: DNS y WebRTC no tienen botones de prueba (DNS tendría que salir a la
 red al pulsarlos y WebRTC no tiene entrada), y JWT, Contraseña, Decodificador y Secretos no
 llevan "cómo lo consigo" porque no hay nada que explicar sobre de dónde sale lo que se pega.
+
+### v1.2.1 — lo que encontró la validación con datos de terceros (2026-09-24)
+
+Los "0 falsos positivos" que aparecen más arriba en este documento eran ciertos **sobre un
+corpus escrito a mano**, y esa es justo su limitación: mide lo que ya se esperaba. Medido
+contra el top 5.000 de Tranco, el resultado real era **2,04%**.
+
+Tres bugs, ninguno detectable con el corpus propio:
+
+1. **Dominios de país de la marca.** `'google.com.br'.includes('google.com.')` es cierto, y esa
+   es exactamente la forma del ataque `google.com.inicio-sesion.net`. Se distinguen porque en
+   el legítimo lo que sigue es un código de país de dos letras y ahí acaba el dominio. Afectaba
+   a `amazon.com.mx`, `santander.com.br` y a todos los `.com.XX` de Latinoamérica.
+2. **TLD que son la marca.** `.google`, `.microsoft` y `.apple` se los delegó ICANN a esas
+   empresas: `blog.google` y `cloud.microsoft` son suyos por definición. Catorce dominios
+   reales salían marcados.
+3. **Colisiones por distancia de edición.** `usps.com` está a UNA edición de `ups.com`, y
+   `chess.com` a dos de `chase.com`. Los dos de cada par son legítimos y ninguna regla de
+   distancia los separa. Se midieron tres umbrales y **ninguno sale rentable**: el mejor da
+   0,10 detecciones por falso positivo. Bajar el umbral además rompía `payypall.com`, que es la
+   forma para la que se hizo la heurística. Solución: lista de excepciones curada a mano desde
+   el top 20.000 de Tranco (`public/data/no-son-typosquat.json`), dejando fuera a propósito los
+   que parecen squats de verdad (`googl.com`, `tospotify.com`, `adobess.com`).
+
+Al añadir `a.co` y `g.co` a las marcas se introdujo una regresión: la comparación era por
+subcadena y `'honda.co.jp'.includes('a.co')` es cierto, así que marcaba `samsung.co.kr`,
+`mega.co.nz` y treinta más. Ahora compara por etiquetas completas.
+
+**Resultado medido sobre el tramo reservado** (puestos 20.001-25.000, que el ajuste no vio):
+2% → **0,46%** de falsos positivos, sin perder detección (25,5% antes y después).
+
+Lo que la validación dice sobre la detección, y conviene no maquillar: sobre un feed global de
+phishing confirmado, las heurísticas offline marcan el **25,5%**, y 23 de esos puntos son solo
+"no usa HTTPS". El phishing moderno vive en webs comprometidas y dominios desechables de
+aspecto anodino, no en typosquatting. Lo que de verdad detecta es la consulta a listas de
+amenazas: **38,6% de los dominios aún vivos**, con **0 bloqueos falsos** sobre 150 dominios
+populares. El 28/30 de las campañas españolas sigue siendo cierto para esa forma concreta de
+ataque, pero no generaliza.
+
+Nota de mantenimiento: `no-son-typosquat.json` depende de la lista de marcas. Si se añaden
+marcas nuevas hay que regenerarla con `tests/validacion-externa.html`.

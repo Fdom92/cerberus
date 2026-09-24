@@ -88,6 +88,33 @@ A third suite at `tests/hostile-audit.html` throws XSS payloads, malformed input
 
 There's a second suite at `tests/fp-audit.html` that runs the opposite check: a corpus of **legitimate** real-world inputs (2FA codes, accented domains, newsletters sent through Mailchimp, compressed installers, documentation placeholders) that must **not** be flagged. A security tool that cries wolf at ordinary things teaches people to ignore it, which is worse than having no tool — so this suite is treated as seriously as the detection tests. It prints a table of anything that trips, rather than pass/fail.
 
+### Measured against lists I did not write
+
+Every other suite tests attacks written by the same person who wrote the defences, so it can
+only confirm what was already expected. `tests/validacion-externa.html` measures the same
+heuristics against third-party lists: [Tranco](https://tranco-list.eu) for legitimate domains,
+OpenPhish and Phishing.Database for confirmed phishing. Network checks off, the default anyone
+gets. The corpus is not versioned; `tests/_corpus/construir.py` rebuilds it.
+
+The first run corrected the record. Against 5,000 real popular domains it flagged **2.04%** —
+not the zero the hand-picked corpus showed. Three causes, all real bugs: legitimate country
+domains (`google.com.br`, `amazon.com.mx`), brand-owned TLDs (`cloud.microsoft`, `blog.google`)
+and edit-distance collisions between real sites (`usps.com` is one edit from `ups.com`).
+
+After fixing them, measured on a **held-out slice the tuning never saw** (Tranco ranks
+20,001–25,000): **0.46% false positives**, with detection unchanged.
+
+Detection is the number worth being honest about. On a global feed of confirmed phishing the
+offline heuristics flag **25.5%**, and 23 of those points are just "this URL is not HTTPS" —
+structural detection alone is a few percent. Modern phishing mostly runs on compromised
+legitimate sites and throwaway domains that look unremarkable. The opt-in threat-list lookup is
+what carries real-world detection: on the same feed it blocked **38.6% of the hosts still
+alive** (the rest had already been taken down) with **no false blocks** on 150 popular domains.
+
+The 28-of-30 figure elsewhere in this repo is Spanish smishing campaigns — brand-impersonation
+shapes this tool was built for. It does not generalise to global phishing, and both numbers are
+kept here rather than picking the flattering one.
+
 ## Deploying
 
 Any static host works — `public/` is the whole site, with nothing to build.

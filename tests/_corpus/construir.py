@@ -13,7 +13,7 @@ legitimos = []
 with open("/tmp/tranco/top-1m.csv", encoding="utf-8") as f:
     for linea in f:
         legitimos.append(linea.strip().split(",", 1)[1])
-        if len(legitimos) >= 20000:
+        if len(legitimos) >= 25000:
             break
 
 phishing = set()
@@ -30,6 +30,9 @@ phishing = sorted(phishing)
 random.shuffle(phishing)
 phishing = phishing[:20000]
 
-json.dump(legitimos, open(os.path.join(AQUI, "legitimos.json"), "w"), ensure_ascii=False)
+# Los 20.000 primeros sirven para medir y para generar las excepciones de typosquat; el
+# tramo 20.001-25.000 queda reservado para comprobar la mejora sobre dominios no vistos.
+json.dump(legitimos[:20000], open(os.path.join(AQUI, "legitimos.json"), "w"), ensure_ascii=False)
+json.dump(legitimos[20000:], open(os.path.join(AQUI, "legitimos_reservados.json"), "w"), ensure_ascii=False)
 json.dump(phishing, open(os.path.join(AQUI, "phishing.json"), "w"), ensure_ascii=False)
-print(f"legítimos: {len(legitimos)}   phishing: {len(phishing)}")
+print(f"legítimos: {len(legitimos[:20000])}   reservados: {len(legitimos[20000:])}   phishing: {len(phishing)}")

@@ -6,10 +6,10 @@
 // España vs EEUU) — un solo string habría generado falsos positivos.
 export const BRAND_DOMAINS = {
   paypal: ["paypal.com"],
-  google: ["google.com"],
-  microsoft: ["microsoft.com"],
-  apple: ["apple.com"],
-  amazon: ["amazon.com", "amazon.es"],
+  google: ["google.com", "google-analytics.com", "googleapis.com", "googleusercontent.com", "gstatic.com", "g.co"],
+  microsoft: ["microsoft.com", "onmicrosoft.com", "microsoftazuread-sso.com", "s-microsoft.com", "microsoftonline.com", "windows.net"],
+  apple: ["apple.com", "apple-dns.net", "cdn-apple.com", "apple-cloudkit.com", "icloud-content.com"],
+  amazon: ["amazon.com", "amazon.es", "amazon-adsystem.com", "media-amazon.com", "ssl-images-amazon.com", "amazonaws.com", "a.co"],
   netflix: ["netflix.com"],
   santander: ["santander.com", "santander.es"],
   bbva: ["bbva.com", "bbva.es"],
