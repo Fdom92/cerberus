@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Cerberus — Centro de análisis</title>
 <meta name="description" content="Comprueba enlaces, códigos QR, SMS, correos y archivos sospechosos desde el móvil. Funciona sin conexión y sin enviar tus datos a ningún sitio.">
 
@@ -178,7 +179,7 @@
 
     <form id="urlForm">
       <input id="urlInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
-             placeholder="https://bit.ly/ejemplo" required>
+             placeholder="https://bit.ly/ejemplo" required aria-label="Enlace a analizar">
       <button type="submit">Analizar</button>
     </form>
 
@@ -190,7 +191,7 @@
       Al activarlo: el dominio se consulta contra las listas de phishing y malware de <strong>Cloudflare</strong>; la URL se envía a <strong>api.microlink.io</strong> para averiguar a dónde lleva de verdad (25 consultas al día); y para fechar el dominio se consulta <strong>rdap.org</strong> y, en los dominios cuyo registro no publica RDAP (<code>.es</code>, <code>.eu</code>), el registro público de certificados <strong>crt.sh</strong>. No se envía nada más de tu dispositivo.
     </p>
 
-    <div id="urlResult" class="result" hidden></div>
+    <div id="urlResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-file" class="panel">
@@ -217,7 +218,7 @@
       </label>
     </div>
 
-    <div id="fileResult" class="result" hidden></div>
+    <div id="fileResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-history" class="panel">
@@ -254,7 +255,7 @@
       <button type="button" class="sample-btn danger" id="sampleMailMalicious">🚩 Probar malicioso</button>
     </div>
     <form id="mailForm">
-      <textarea id="mailInput" rows="8" placeholder="Pega las cabeceras (lo mejor) o el texto del correo tal cual" required></textarea>
+      <textarea id="mailInput" rows="8" placeholder="Pega las cabeceras (lo mejor) o el texto del correo tal cual" required aria-label="Cabeceras o texto del correo"></textarea>
       <button type="submit">Analizar</button>
     </form>
     <label class="toggle">
@@ -264,7 +265,7 @@
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
     </p>
-    <div id="mailResult" class="result" hidden></div>
+    <div id="mailResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-sms" class="panel">
@@ -285,7 +286,7 @@
       <button type="button" class="sample-btn danger" id="sampleSmsMalicious">🚩 Probar malicioso</button>
     </div>
     <form id="smsForm">
-      <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required></textarea>
+      <textarea id="smsInput" rows="6" placeholder="Tu paquete está retenido en aduana, paga aquí: https://..." required aria-label="Texto del mensaje"></textarea>
       <button type="submit">Analizar</button>
     </form>
     <label class="toggle">
@@ -295,7 +296,7 @@
     <p class="netwarn net-warn" hidden>
       Al activarlo, los dominios enlazados en el mensaje se consultan contra las listas de phishing y malware de <strong>Cloudflare</strong>. El texto del mensaje nunca sale de tu dispositivo.
     </p>
-    <div id="smsResult" class="result" hidden></div>
+    <div id="smsResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-dns" class="panel">
@@ -309,11 +310,11 @@
       <p>Comprueba si un dominio tiene SPF y DMARC configurados — sin esto, es más fácil falsificar correos "de" ese dominio. Útil para verificar el tuyo propio o el de una empresa que te escribió. Consulta DNS pública (Cloudflare) — el dominio nunca se guarda salvo el propio resultado en tu historial.</p>
     </details>
     <form id="dnsForm">
-      <input id="dnsInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ejemplo.com" required>
+      <input id="dnsInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ejemplo.com" required aria-label="Dominio a comprobar">
       <button type="submit">Comprobar</button>
     </form>
     <p class="netwarn aviso-accion">Al pulsar <em>Comprobar</em>, el dominio se consulta en el DNS público de <strong>Cloudflare</strong> (cloudflare-dns.com). No se envía nada más de tu dispositivo.</p>
-    <div id="dnsResult" class="result" hidden></div>
+    <div id="dnsResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-jwt" class="panel">
@@ -328,10 +329,10 @@
       <button type="button" class="sample-btn danger" id="sampleJwtMalicious">🚩 Probar sin firma</button>
     </div>
     <form id="jwtForm">
-      <textarea id="jwtInput" rows="4" placeholder="eyJhbGciOi...header.eyJzdWIiOi...payload.firma" required></textarea>
+      <textarea id="jwtInput" rows="4" placeholder="eyJhbGciOi...header.eyJzdWIiOi...payload.firma" required aria-label="Token JWT"></textarea>
       <button type="submit">Decodificar</button>
     </form>
-    <div id="jwtResult" class="result" hidden></div>
+    <div id="jwtResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-webrtc" class="panel">
@@ -346,7 +347,7 @@
     </details>
     <button type="button" id="webrtcRun">Comprobar mi IP</button>
     <p class="netwarn aviso-accion">Al pulsar, tu navegador contacta <strong>stun.l.google.com</strong> (STUN) y <strong>api.ipify.org</strong> (IP pública) para comparar. No se guarda nada en historial — es información sobre ti, no un archivo o mensaje externo.</p>
-    <div id="webrtcResult" class="result" hidden></div>
+    <div id="webrtcResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-password" class="panel">
@@ -361,15 +362,15 @@
       <button type="button" class="sample-btn danger" id="samplePasswordWeak">🚩 Probar débil</button>
     </div>
     <div class="row">
-      <input id="passwordInput" type="password" autocomplete="off" placeholder="Escribe una contraseña para probar">
+      <input id="passwordInput" type="password" autocomplete="off" placeholder="Escribe una contraseña para probar" aria-label="Contraseña a evaluar">
       <button type="button" id="passwordToggle" class="secondary">Ver</button>
     </div>
     <div id="pwnedSection" hidden>
       <button type="button" id="pwnedCheckBtn" class="secondary">Comprobar si está filtrada</button>
       <p class="netwarn aviso-accion">Envía solo los primeros 5 caracteres del hash SHA-1 de la contraseña a <strong>api.pwnedpasswords.com</strong> — la contraseña en sí nunca sale del dispositivo (k-anonimity). No se guarda en historial.</p>
     </div>
-    <div id="passwordResult" class="result" hidden></div>
-    <div id="pwnedResult" class="result" hidden></div>
+    <div id="passwordResult" class="result" aria-live="polite" hidden></div>
+    <div id="pwnedResult" class="result" aria-live="polite" hidden></div>
 
   </section>
 
@@ -384,10 +385,10 @@
       <button type="button" class="sample-btn" id="sampleDecode">▶ Probar ejemplo</button>
     </div>
     <form id="decodeForm">
-      <textarea id="decodeInput" rows="4" placeholder="SGVsbG8gbXVuZG8=" required></textarea>
+      <textarea id="decodeInput" rows="4" placeholder="SGVsbG8gbXVuZG8=" required aria-label="Texto a decodificar"></textarea>
       <button type="submit">Decodificar</button>
     </form>
-    <div id="decodeResult" class="result" hidden></div>
+    <div id="decodeResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-secrets" class="panel">
@@ -402,10 +403,10 @@
       <button type="button" class="sample-btn danger" id="sampleSecretsMalicious">🚩 Probar con secretos</button>
     </div>
     <form id="secretsForm">
-      <textarea id="secretsInput" rows="8" placeholder="const AWS_KEY = 'AKIA...'&#10;api_key: 'sk_live_...'" required></textarea>
+      <textarea id="secretsInput" rows="8" placeholder="const AWS_KEY = 'AKIA...'&#10;api_key: 'sk_live_...'" required aria-label="Código o configuración a revisar"></textarea>
       <button type="submit">Analizar</button>
     </form>
-    <div id="secretsResult" class="result" hidden></div>
+    <div id="secretsResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-apps" class="panel">
@@ -429,7 +430,7 @@
         <input type="file" id="appsInput" accept=".apk,.ipa,.exe,.dylib,.so,application/vnd.android.package-archive" hidden>
       </label>
     </div>
-    <div id="appsResult" class="result" hidden></div>
+    <div id="appsResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-qr" class="panel">
@@ -469,7 +470,7 @@
       Solo se usa si el código contiene un enlace, y entonces se comprueba igual que en la herramienta de URLs: listas de <strong>Cloudflare</strong>, destino final vía <strong>api.microlink.io</strong> y antigüedad del dominio vía <strong>rdap.org</strong> / <strong>crt.sh</strong>. La imagen del código nunca sale de tu dispositivo.
     </p>
 
-    <div id="qrResult" class="result" hidden></div>
+    <div id="qrResult" class="result" aria-live="polite" hidden></div>
   </section>
 
   <section id="panel-exif" class="panel">
@@ -497,13 +498,13 @@
         <input type="file" id="exifInput" accept="image/jpeg" hidden>
       </label>
     </div>
-    <div id="exifResult" class="result" hidden></div>
+    <div id="exifResult" class="result" aria-live="polite" hidden></div>
   </section>
 
 </main>
 
 <footer class="footer">
-  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">red: desactivada</span> · <span id="appVersion" title="Si tienes la app instalada y aquí no ves esta versión, tu móvil sigue con una copia antigua en caché.">v1.1.2</span></span>
+  <span>Sin cuentas ni servidores propios · cada herramienta indica si necesita red · <span id="netState">red: desactivada</span> · <span id="appVersion" title="Si tienes la app instalada y aquí no ves esta versión, tu móvil sigue con una copia antigua en caché.">v1.2.0</span> · <a class="pie-enlace" href="https://github.com/Fdom92/cerberus/issues/new?title=Resultado%20equivocado&body=Herramienta:%20%0AQu%C3%A9%20pegu%C3%A9%20(sin%20datos%20personales):%20%0AQu%C3%A9%20dijo%20Cerberus:%20%0AQu%C3%A9%20esperabas:%20%0A%0ANo%20pegues%20contrase%C3%B1as,%20tokens%20ni%20datos%20personales." target="_blank" rel="noopener noreferrer">¿Falló un resultado? Cuéntamelo</a></span>
 </footer>
 
 <script type="module" src="js/app.js"></script>

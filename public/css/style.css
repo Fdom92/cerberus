@@ -818,3 +818,8 @@ form > input[type="text"] {
   width: 100%;
   margin: 0 0 var(--e3);
 }
+
+/* Enlace para reportar un resultado equivocado. La app no tiene telemetría —a propósito—, así
+   que sin esto nadie puede avisar de un falso positivo. */
+.pie-enlace { color: var(--accent); text-decoration: none; }
+.pie-enlace:hover { text-decoration: underline; }

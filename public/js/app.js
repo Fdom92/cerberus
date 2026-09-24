@@ -53,7 +53,7 @@ function flagSeverity(flag) {
 }
 // Se enseña en el pie porque es la única forma que tiene alguien con la PWA instalada de
 // saber si su móvil ya cogió la versión nueva o sigue sirviendo la copia en caché.
-const APP_VERSION = "1.1.2";
+const APP_VERSION = "1.2.0";
 
 function escapeHtml(str) {
   const div = document.createElement("div");

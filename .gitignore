@@ -1,2 +1,6 @@
 node_modules/
 .superpowers/
+
+# Corpus descargado para la validación externa: no se versiona (son listas
+# enormes y una de ellas son URLs maliciosas reales).
+tests/_corpus/*.json

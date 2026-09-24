@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cerberus — Validación con datos de terceros</title>
+<link rel="stylesheet" href="../public/css/style.css">
+<style>
+  main { max-width: 900px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: var(--e4); }
+  th, td { text-align: left; padding: var(--e2); border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; }
+  .cifra { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e3); margin-top: var(--e4); }
+  .tarjeta { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 14px; padding: var(--e4); }
+  code { word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Validación con datos de terceros</h1>
+  <p class="hint lead">Las demás suites usan ataques que escribí yo, así que miden lo que yo ya esperaba.
+  Esta mide contra listas que no he hecho yo: <strong>Tranco</strong> (dominios legítimos más visitados del
+  mundo) y <strong>OpenPhish</strong> + <strong>Phishing.Database</strong> (phishing confirmado por terceros).
+  Todo con las comprobaciones de red <strong>apagadas</strong>: es la configuración por defecto y la que
+  usa cualquiera que abra la app.</p>
+  <p class="hint">El corpus no se versiona. Para regenerarlo: <code>tests/_corpus/README.md</code>.</p>
+  <div id="estado" class="hint">Cargando corpus…</div>
+  <div id="resumen" class="tarjetas"></div>
+  <div id="detalle"></div>
+</main>
+<script type="module" src="validacion-externa.js"></script>
+</body>
+</html>
